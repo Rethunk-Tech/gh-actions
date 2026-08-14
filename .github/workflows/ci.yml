@@ -62,12 +62,19 @@ jobs:
             done
           done
 
-  # Each action gets a cold-cache job (proves install works, cache-hit is empty) followed by
+  # Each action gets a cold-cache job (proves install works, no exact cache hit) followed by
   # a warm-cache job (needs: <cold job>, so it only starts after the cold job's cache save
   # completed — this is what actually proves cache-hit == 'true' on the second run, since
   # actions/cache saves in a post step that a same-job second invocation would never see in
   # time). setup-bun and setup-nextjs-bun use separate fixtures with different lockfile
-  # content so their cache keys never collide with each other.
+  # content, so their exact cache KEYS never collide — but both intentionally share the same
+  # restore-keys PREFIX (${{ runner.os }}-bun-, for cross-project cache warmth in real
+  # consumers). Because the two cold jobs run in parallel, one fixture's post-step save can
+  # land before the other's restore runs, producing a legitimate restore-keys PARTIAL match
+  # (cache-hit: 'false') rather than a total miss (cache-hit: ''). Both are valid "not an
+  # exact hit" outcomes on a genuinely cold run, so the assertion checks != 'true', not
+  # emptiness — a real regression (a stale EXACT match surviving the reset job) still fails
+  # this. Confirmed against a real run, not assumed: 2026-08-14.
   test-setup-bun-cold:
     name: setup-bun self-test (cold cache)
     needs: reset-self-test-caches
@@ -78,13 +85,13 @@ jobs:
         uses: ./setup-bun
         with:
           working-directory: .github/test-fixtures/bun-app
-      - name: assert deps installed and cache-hit empty
+      - name: assert deps installed and no exact cache hit
         env:
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
         run: |
           test -d .github/test-fixtures/bun-app/node_modules/is-odd
-          if [ -n "$CACHE_HIT" ]; then
-            echo "::error::expected empty cache-hit on cold run, got '$CACHE_HIT'" >&2
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "::error::expected no exact cache-hit on cold run, got 'true'" >&2
             exit 1
           fi
 
@@ -117,13 +124,13 @@ jobs:
         uses: ./setup-nextjs-bun
         with:
           working-directory: .github/test-fixtures/nextjs-app
-      - name: assert deps installed and cache-hit empty
+      - name: assert deps installed and no exact cache hit
         env:
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
         run: |
           test -d .github/test-fixtures/nextjs-app/node_modules/is-even
-          if [ -n "$CACHE_HIT" ]; then
-            echo "::error::expected empty cache-hit on cold run, got '$CACHE_HIT'" >&2
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "::error::expected no exact cache-hit on cold run, got 'true'" >&2
             exit 1
           fi
 

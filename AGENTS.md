@@ -98,6 +98,16 @@ to get wrong when writing that kind of test:
   save; without it, cache steps are effectively no-ops in local testing.
 - Any test fixture created for local iteration stays untracked/cleaned up before committing —
   `.github/test-fixtures/` is the one committed exception, used by `ci.yml`'s own self-test.
+- **`actions/cache`'s `cache-hit` output is tri-state, not boolean:** `''` (total miss —
+  neither the exact key nor any `restore-keys` prefix matched), `'false'` (a `restore-keys`
+  *partial* match restored something, but not the exact key), `'true'` (exact key match).
+  `setup-bun` and `setup-nextjs-bun` intentionally share the same `restore-keys` prefix
+  (`${{ runner.os }}-bun-`) so unrelated projects on the same runner OS warm-start each
+  other's Bun install-store cache — a deliberate design choice, not an oversight. This means
+  a "cold" self-test job can legitimately see `cache-hit: 'false'` if a *different* fixture's
+  job saved its cache first in a parallel run — real, observed 2026-08-14, not theoretical.
+  Assert `!= 'true'` on a cold run (rules out a stale exact-match surviving the cache reset),
+  never emptiness (rules out the intentional, racy, harmless partial-match case too).
 
 ## The one design decision worth understanding before touching `setup-nextjs-bun`
 
