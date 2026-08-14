@@ -1,0 +1,34 @@
+name: New action proposal
+description: Propose adding a new shared action to this repo
+title: "action: "
+labels:
+  - new-action
+body:
+  - type: markdown
+    attributes:
+      value: |
+        See [AGENTS.md § Status](../../AGENTS.md#status) for actions already designed but
+        not yet built (`setup-go`, `setup-dotnet`, `upload-pages`) before proposing a new one
+        — it may already be scoped.
+  - type: textarea
+    id: duplication
+    attributes:
+      label: What's duplicated across the fleet
+      description: Which repos, roughly how many, what the copy-pasted CI block looks like
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: Proposed inputs / outputs
+    validations:
+      required: true
+  - type: checkboxes
+    id: conventions
+    attributes:
+      label: Fits this repo's conventions (see AGENTS.md)
+      options:
+        - label: No actions/checkout inside the action
+        - label: No lint/build/test steps baked in
+        - label: Every wrapped action would be SHA-pinned
+        - label: "No inline ${{ inputs.* }} interpolation inside run: blocks"

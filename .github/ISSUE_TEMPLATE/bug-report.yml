@@ -1,0 +1,43 @@
+name: Bug report
+description: Something's wrong with an existing action
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: dropdown
+    id: action
+    attributes:
+      label: Which action
+      options:
+        - setup-bun
+        - setup-nextjs-bun
+        - other / not sure
+    validations:
+      required: true
+  - type: input
+    id: consuming-repo
+    attributes:
+      label: Consuming repo + workflow run
+      description: Link to the failing run, if this happened in a real consumer rather than this repo's own CI
+      placeholder: https://github.com/org/repo/actions/runs/12345
+  - type: textarea
+    id: inputs
+    attributes:
+      label: Inputs passed to the action
+      description: "The with:/env: block that triggered it"
+      render: yaml
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the relevant log output
+    validations:
+      required: true

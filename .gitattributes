@@ -1,0 +1,4 @@
+# Force LF line endings on checkout regardless of the checking-out platform's
+# core.autocrlf, so a CRLF checkout of a YAML action file never produces a
+# false diff or a subtly different `run:` script on Windows.
+* text=auto eol=lf

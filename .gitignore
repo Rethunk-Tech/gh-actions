@@ -1,0 +1,9 @@
+# Local `act` testing scratch — created ad hoc while iterating on an action,
+# never committed. .github/test-fixtures/ is the one committed exception.
+.test-fixture/
+
+# Fixture-generated deps, not part of the fixture itself.
+.github/test-fixtures/**/node_modules/
+
+# Local agent/editor settings. Nothing here is shared.
+.claude/
