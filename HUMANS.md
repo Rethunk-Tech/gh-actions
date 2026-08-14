@@ -1,0 +1,75 @@
+# Using gh-actions
+
+Shared composite GitHub Actions for the fleet — public, not Marketplace-listed. Reference an
+action directly from any repo in any org:
+
+```yaml
+uses: Rethunk-Tech/gh-actions/<action>@<ref>
+```
+
+No install step, no setup on the consuming repo beyond a normal `actions/checkout` before the
+`uses:` line — these are composite actions, not a CLI you run locally.
+
+## Available actions
+
+### `setup-bun`
+
+Generic Bun toolchain + install + cache. No framework assumptions.
+
+```yaml
+- uses: actions/checkout@v7
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1
+  with:
+    working-directory: frontend        # default: .
+    # bun-version: "1.3.14"            # default: resolved from package.json's packageManager
+    # install-args: --no-frozen-lockfile
+    # node-version: "22"               # opt-in Node runtime alongside Bun
+    # install-playwright: "true"
+    # playwright-browsers: chromium    # scope the Playwright install; empty = install everything
+    # extra-cache-paths: |             # an additional cache, independently keyed
+    #   frontend/.some-build-cache
+    # extra-cache-key: ${{ hashFiles('frontend/**/*.ts') }}
+    # extra-cache-restore-key-fragment: ${{ hashFiles('frontend/bun.lock') }}
+```
+
+Output: `cache-hit` — whether the Bun install-store cache was hit.
+
+### `setup-nextjs-bun`
+
+Everything `setup-bun` does, plus a `.next/cache` build cache and `NEXT_TELEMETRY_DISABLED=1`.
+One Next.js app per `working-directory` — for a repo with multiple Next apps, call `setup-bun`
+once per app instead.
+
+```yaml
+- uses: actions/checkout@v7
+- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1
+  with:
+    working-directory: frontend
+    # same optional inputs as setup-bun: bun-version, install-args, node-version,
+    # install-playwright, playwright-browsers
+```
+
+Output: `cache-hit` — whether the Bun install-store cache was hit.
+
+### Coming later
+
+`setup-go`, `setup-dotnet`, and `upload-pages` are designed but not yet built — see
+[AGENTS.md](AGENTS.md) for status.
+
+## Pinning
+
+Pin by tag (`@v1`) for convenience, or by commit SHA with a version comment for maximum
+supply-chain hardening, matching how these actions pin their own dependencies:
+
+```yaml
+uses: Rethunk-Tech/gh-actions/setup-bun@<sha> # v1.0.0
+```
+
+`repo-ops`'s `--actions-refresh-sha` sweep (Rethunk-Tech/repo-ops) keeps a SHA pin current
+within a major automatically; crossing a major (`v1` → `v2`) needs
+`--actions-refresh-sha --latest`.
+
+## Reporting a problem
+
+Open an issue on this repo. For a security concern, see [SECURITY.md](SECURITY.md) instead of
+a public issue.
