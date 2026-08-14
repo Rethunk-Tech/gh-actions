@@ -1,0 +1,121 @@
+name: Setup Next.js + Bun
+description: >
+  Install Bun, restore its install-store cache, restore Next.js's .next/cache build cache,
+  optionally install a Node.js runtime alongside Bun, optionally install Playwright browsers,
+  run `bun install`, and disable Next telemetry. Does not compose setup-bun (see repo README
+  for why) — duplicates its core steps directly. Single Next app per working-directory; for a
+  multi-app repo, call setup-bun once per app instead.
+
+inputs:
+  bun-version:
+    description: >
+      Bun version to install. Leave empty to resolve from working-directory/package.json's
+      packageManager field instead.
+    required: false
+    default: ""
+  working-directory:
+    description: Directory containing the Next app (package.json/bun.lock/.next).
+    required: false
+    default: "."
+  install-args:
+    description: Extra args for `bun install` (e.g. --no-frozen-lockfile).
+    required: false
+    default: ""
+  install-playwright:
+    description: When true, installs Playwright browsers (no caching — see README).
+    required: false
+    default: "false"
+  playwright-browsers:
+    description: >
+      Space-separated browser names to scope the Playwright install to (e.g. "chromium").
+      Empty installs Playwright's full default set.
+    required: false
+    default: ""
+  node-version:
+    description: When set, installs this Node.js version via actions/setup-node before Bun setup.
+    required: false
+    default: ""
+
+outputs:
+  cache-hit:
+    description: Whether the Bun install-store cache was hit.
+    value: ${{ steps.bun-cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node
+      if: inputs.node-version != ''
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+      with:
+        bun-version: ${{ inputs.bun-version }}
+        bun-version-file: ${{ inputs.bun-version == '' && format('{0}/package.json', inputs.working-directory) || '' }}
+
+    - name: Verify lockfile exists, resolve Next cache dir
+      shell: bash
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: |
+        if [ ! -f "$WORKING_DIRECTORY/bun.lock" ]; then
+          echo "::error::$WORKING_DIRECTORY/bun.lock not found — refusing to build a cache key from a missing lockfile" >&2
+          exit 1
+        fi
+        # Resolved here (not inlined as an inputs.* expression in the cache step below) so a
+        # consumer that nests this action inside their own local composite doesn't hit the
+        # actions/cache post-step context bug for local composite nesting
+        # (actions/runner#2009, #2030) — see repo README.
+        echo "NEXT_CACHE_DIR=${WORKING_DIRECTORY}/.next/cache" >> "$GITHUB_ENV"
+
+    - name: Cache Bun install store
+      id: bun-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.bun/install/cache
+        key: ${{ runner.os }}-bun-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}
+        restore-keys: |
+          ${{ runner.os }}-bun-
+
+    - name: Cache Next.js build cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ env.NEXT_CACHE_DIR }}
+        key: ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-${{ hashFiles(format('{0}/**/*.js', inputs.working-directory), format('{0}/**/*.jsx', inputs.working-directory), format('{0}/**/*.ts', inputs.working-directory), format('{0}/**/*.tsx', inputs.working-directory)) }}
+        restore-keys: |
+          ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-
+
+    - name: bun install
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INSTALL_ARGS: ${{ inputs.install-args }}
+      run: |
+        if [ -n "$INSTALL_ARGS" ]; then
+          # INSTALL_ARGS may hold multiple space-separated flags; word-splitting is intentional.
+          # shellcheck disable=SC2086
+          bun install $INSTALL_ARGS
+        else
+          bun install
+        fi
+
+    - name: Install Playwright
+      if: inputs.install-playwright == 'true'
+      shell: bash
+      env:
+        PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
+      run: |
+        if [ -n "$PLAYWRIGHT_BROWSERS" ]; then
+          # PLAYWRIGHT_BROWSERS may hold multiple space-separated browser names; word-splitting is intentional.
+          # shellcheck disable=SC2086
+          bunx playwright install --with-deps $PLAYWRIGHT_BROWSERS
+        else
+          bunx playwright install --with-deps
+        fi
+
+    - name: Disable Next telemetry
+      shell: bash
+      run: echo "NEXT_TELEMETRY_DISABLED=1" >> "$GITHUB_ENV"
