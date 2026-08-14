@@ -3,8 +3,8 @@ description: >
   Install Bun, restore its install-store cache, restore Next.js's .next/cache build cache,
   optionally install a Node.js runtime alongside Bun, optionally install Playwright browsers,
   run `bun install`, and disable Next telemetry. Does not compose setup-bun (see repo README
-  for why) — duplicates its core steps directly. Single Next app per working-directory; for a
-  multi-app repo, call setup-bun once per app instead.
+  for why) — duplicates its core steps directly. Single Next app per next-app-directory; for a
+  multi-app repo, call this once per app (each with its own next-app-directory).
 
 inputs:
   bun-version:
@@ -14,9 +14,19 @@ inputs:
     required: false
     default: ""
   working-directory:
-    description: Directory containing the Next app (package.json/bun.lock/.next).
+    description: >
+      Directory to run `bun install` in — a Bun workspace root, or the Next app's own
+      directory for a single-app repo (package.json/bun.lock live here).
     required: false
     default: "."
+  next-app-directory:
+    description: >
+      Directory containing the Next app's build output (.next/) and source files, when it
+      differs from working-directory — e.g. a Bun workspace where install runs at the repo
+      root but the Next app lives at apps/dashboard. Leave empty to default to
+      working-directory (the single-app case).
+    required: false
+    default: ""
   install-args:
     description: Extra args for `bun install` (e.g. --no-frozen-lockfile).
     required: false
@@ -56,20 +66,24 @@ runs:
         bun-version: ${{ inputs.bun-version }}
         bun-version-file: ${{ inputs.bun-version == '' && format('{0}/package.json', inputs.working-directory) || '' }}
 
-    - name: Verify lockfile exists, resolve Next cache dir
+    - name: Verify lockfile exists, resolve Next app + cache dirs
       shell: bash
       env:
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        NEXT_APP_DIRECTORY_INPUT: ${{ inputs.next-app-directory }}
       run: |
         if [ ! -f "$WORKING_DIRECTORY/bun.lock" ]; then
           echo "::error::$WORKING_DIRECTORY/bun.lock not found — refusing to build a cache key from a missing lockfile" >&2
           exit 1
         fi
-        # Resolved here (not inlined as an inputs.* expression in the cache step below) so a
-        # consumer that nests this action inside their own local composite doesn't hit the
-        # actions/cache post-step context bug for local composite nesting
-        # (actions/runner#2009, #2030) — see repo README.
-        echo "NEXT_CACHE_DIR=${WORKING_DIRECTORY}/.next/cache" >> "$GITHUB_ENV"
+        # Resolved here (not inlined as inputs.*/env.* expressions in the cache steps below)
+        # so a consumer that nests this action inside their own local composite doesn't hit
+        # the actions/cache post-step context bug for local composite nesting
+        # (actions/runner#2009, #2030) — see repo README. Falls back to working-directory
+        # when next-app-directory is unset (the single-app case, e.g. no Bun workspace).
+        NEXT_APP_DIR="${NEXT_APP_DIRECTORY_INPUT:-$WORKING_DIRECTORY}"
+        echo "NEXT_APP_DIR=${NEXT_APP_DIR}" >> "$GITHUB_ENV"
+        echo "NEXT_CACHE_DIR=${NEXT_APP_DIR}/.next/cache" >> "$GITHUB_ENV"
 
     - name: Cache Bun install store
       id: bun-cache
@@ -84,7 +98,7 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.NEXT_CACHE_DIR }}
-        key: ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-${{ hashFiles(format('{0}/**/*.js', inputs.working-directory), format('{0}/**/*.jsx', inputs.working-directory), format('{0}/**/*.ts', inputs.working-directory), format('{0}/**/*.tsx', inputs.working-directory)) }}
+        key: ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-${{ hashFiles(format('{0}/**/*.js', env.NEXT_APP_DIR), format('{0}/**/*.jsx', env.NEXT_APP_DIR), format('{0}/**/*.ts', env.NEXT_APP_DIR), format('{0}/**/*.tsx', env.NEXT_APP_DIR)) }}
         restore-keys: |
           ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-
 

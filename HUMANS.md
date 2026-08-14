@@ -37,8 +37,7 @@ Output: `cache-hit` — whether the Bun install-store cache was hit.
 ### `setup-nextjs-bun`
 
 Everything `setup-bun` does, plus a `.next/cache` build cache and `NEXT_TELEMETRY_DISABLED=1`.
-One Next.js app per `working-directory` — for a repo with multiple Next apps, call `setup-bun`
-once per app instead.
+One Next.js app per call — for a repo with multiple Next apps, call this once per app instead.
 
 ```yaml
 - uses: actions/checkout@v7
@@ -48,6 +47,19 @@ once per app instead.
     # same optional inputs as setup-bun: bun-version, install-args, node-version,
     # install-playwright, playwright-browsers
 ```
+
+**Bun workspace / monorepo**, where `bun install` must run at the workspace root but the
+Next app itself lives in a subdirectory (`.next/`, source files to hash for the build-cache
+key) — set `next-app-directory` separately from `working-directory`:
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1
+  with:
+    working-directory: .                     # workspace root — bun install runs here
+    next-app-directory: apps/dashboard        # the actual Next app — .next/cache lives here
+```
+
+Leave `next-app-directory` unset for a single-app repo — it defaults to `working-directory`.
 
 Output: `cache-hit` — whether the Bun install-store cache was hit.
 
