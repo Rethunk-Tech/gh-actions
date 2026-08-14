@@ -34,15 +34,43 @@ jobs:
       - name: Lint workflows
         run: ./actionlint .github/workflows/*.yml
 
+  # actions/cache persists ACROSS separate workflow runs on the same ref (GitHub's real cache
+  # backend, not act's throwaway local one) — a cold-cache job only sees a genuine miss on the
+  # very first run against a given fixture's lockfile; every later push whose fixture didn't
+  # change would incorrectly restore the previous run's cache. Found via a real GitHub-hosted
+  # run, not local `act` testing (which resets its cache-server-path per invocation and can't
+  # surface this). Fix: wipe both self-test cache prefixes for this ref in one serial job
+  # before either -cold job starts, so there's no window for a race between the two fixtures'
+  # deletes and saves.
+  reset-self-test-caches:
+    name: Reset self-test caches (ensure genuinely cold)
+    needs: lint
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Delete Linux-bun-* and Linux-nextjs-* caches for this ref
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # --ref cannot be combined with a numeric cache ID (only with a key string) —
+          # confirmed against the real API before this landed. IDs are already unambiguous,
+          # so no --ref is needed on the delete call itself.
+          for prefix in Linux-bun- Linux-nextjs-; do
+            for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id'); do
+              gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
+            done
+          done
+
   # Each action gets a cold-cache job (proves install works, cache-hit is empty) followed by
   # a warm-cache job (needs: <cold job>, so it only starts after the cold job's cache save
-  # completed — GitHub's real cache backend, not act's local one; this is what actually
-  # proves cache-hit == 'true' on the second run, since actions/cache saves in a post step
-  # that a same-job second invocation would never see in time). setup-bun and setup-nextjs-bun
-  # use separate fixtures with different lockfile content so their cache keys never collide.
+  # completed — this is what actually proves cache-hit == 'true' on the second run, since
+  # actions/cache saves in a post step that a same-job second invocation would never see in
+  # time). setup-bun and setup-nextjs-bun use separate fixtures with different lockfile
+  # content so their cache keys never collide with each other.
   test-setup-bun-cold:
     name: setup-bun self-test (cold cache)
-    needs: lint
+    needs: reset-self-test-caches
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,7 +109,7 @@ jobs:
 
   test-setup-nextjs-bun-cold:
     name: setup-nextjs-bun self-test (cold cache)
-    needs: lint
+    needs: reset-self-test-caches
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
