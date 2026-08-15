@@ -34,6 +34,8 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   `packageManager` field by default — no version to keep in sync by hand.
 - `setup-nextjs-bun` adds a `.next/cache` build cache keyed exactly per Next.js's own
   documented CI caching guide (lockfile hash + source-file hash, independently invalidated).
+- `setup-go` wraps `actions/setup-go`'s own module/build cache — no hand-rolled cache key to
+  keep in sync with upstream's.
 - Every wrapped dependency is SHA-pinned with a version comment; `repo-ops`'s
   `--actions-refresh-sha` sweep keeps pins current fleet-wide.
 - Actually tested, not just schema-checked: each action runs end-to-end via `act` before a

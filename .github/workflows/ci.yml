@@ -26,6 +26,7 @@ jobs:
         run: |
           uvx check-jsonschema --builtin-schema vendor.github-actions setup-bun/action.yml
           uvx check-jsonschema --builtin-schema vendor.github-actions setup-nextjs-bun/action.yml
+          uvx check-jsonschema --builtin-schema vendor.github-actions setup-go/action.yml
 
       - name: Install actionlint
         run: |
@@ -55,7 +56,7 @@ jobs:
         run: |
           # --ref cannot be combined with a numeric cache ID (only with a key string). IDs are
           # already unambiguous, so no --ref is needed on the delete call itself.
-          for prefix in Linux-bun- Linux-nextjs-; do
+          for prefix in Linux-bun- Linux-nextjs- setup-go-Linux-; do
             for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id'); do
               gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
             done
@@ -143,6 +144,46 @@ jobs:
         uses: ./setup-nextjs-bun
         with:
           working-directory: .github/test-fixtures/nextjs-app
+      - name: assert cache-hit true
+        env:
+          CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" != "true" ]; then
+            echo "::error::expected cache-hit=true on warm run, got '$CACHE_HIT'" >&2
+            exit 1
+          fi
+
+  test-setup-go-cold:
+    name: setup-go self-test (cold cache)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-app/go.mod
+      - name: assert build works and no exact cache hit
+        env:
+          CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+        working-directory: .github/test-fixtures/go-app
+        run: |
+          go build ./...
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "::error::expected no exact cache-hit on cold run, got 'true'" >&2
+            exit 1
+          fi
+
+  test-setup-go-warm:
+    name: setup-go self-test (warm cache)
+    needs: test-setup-go-cold
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-app/go.mod
       - name: assert cache-hit true
         env:
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}

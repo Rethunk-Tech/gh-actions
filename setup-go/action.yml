@@ -1,0 +1,45 @@
+name: Setup Go
+description: >
+  Install a Go toolchain via actions/setup-go, with its built-in module/build cache enabled.
+
+inputs:
+  go-version:
+    description: >
+      Exact Go version to install (e.g. "1.26.5"). Leave empty to resolve from
+      go-version-file instead.
+    required: false
+    default: ""
+  go-version-file:
+    description: >
+      Path to the go.mod (or go.work) file to resolve the Go version from. Only used when
+      go-version is empty. May point into a subdirectory (e.g. "backend/go.mod") when the
+      module isn't at the checkout root.
+    required: false
+    default: go.mod
+  cache-dependency-path:
+    description: >
+      Passthrough to actions/setup-go's cache-dependency-path — glob(s) used to build the
+      module cache key. Leave empty to use actions/setup-go's own default (the resolved
+      go.sum next to go-version-file).
+    required: false
+    default: ""
+
+outputs:
+  go-version:
+    description: The Go version that was installed.
+    value: ${{ steps.setup-go.outputs.go-version }}
+  cache-hit:
+    description: Whether the module/build cache was hit.
+    value: ${{ steps.setup-go.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Go
+      id: setup-go
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.6.0
+      with:
+        go-version: ${{ inputs.go-version }}
+        go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
+        cache: true
+        cache-dependency-path: ${{ inputs.cache-dependency-path }}

@@ -73,10 +73,25 @@ Leave `next-app-directory` unset for a single-app repo — it defaults to `worki
 
 Output: `cache-hit` — whether the Bun install-store cache was hit.
 
+### `setup-go`
+
+Go toolchain via `actions/setup-go`, with its built-in module/build cache enabled.
+
+```yaml
+- uses: actions/checkout@v7
+- uses: Rethunk-Tech/gh-actions/setup-go@v1
+  with:
+    go-version-file: go.mod          # default; may point into a subdir, e.g. backend/go.mod
+    # go-version: "1.26.5"           # exact version instead — overrides go-version-file
+    # cache-dependency-path: go.sum  # default: resolved next to go-version-file
+```
+
+Outputs: `go-version`, `cache-hit`.
+
 ### Coming later
 
-`setup-go`, `setup-dotnet`, and `upload-pages` are designed but not yet built — see
-[AGENTS.md](AGENTS.md) for status.
+`setup-dotnet` and `upload-pages` are designed but not yet built — see [AGENTS.md](AGENTS.md)
+for status.
 
 ## Pinning
 
