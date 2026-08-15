@@ -53,9 +53,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # --ref cannot be combined with a numeric cache ID (only with a key string) —
-          # confirmed against the real API before this landed. IDs are already unambiguous,
-          # so no --ref is needed on the delete call itself.
+          # --ref cannot be combined with a numeric cache ID (only with a key string). IDs are
+          # already unambiguous, so no --ref is needed on the delete call itself.
           for prefix in Linux-bun- Linux-nextjs-; do
             for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id'); do
               gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
@@ -74,7 +73,7 @@ jobs:
   # (cache-hit: 'false') rather than a total miss (cache-hit: ''). Both are valid "not an
   # exact hit" outcomes on a genuinely cold run, so the assertion checks != 'true', not
   # emptiness — a real regression (a stale EXACT match surviving the reset job) still fails
-  # this. Confirmed against a real run, not assumed: 2026-08-14.
+  # this.
   test-setup-bun-cold:
     name: setup-bun self-test (cold cache)
     needs: reset-self-test-caches

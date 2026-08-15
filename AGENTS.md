@@ -12,8 +12,8 @@ here, read [HUMANS.md](HUMANS.md).
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Process — commit style, testing, how to add a new action |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting and trust boundary |
 
-No `CHANGELOG.md`, `docs/`, or `specs/` yet — two actions and no release history to summarize.
-Add a changelog once there's a second tagged version worth distinguishing from the first.
+No `CHANGELOG.md`, `docs/`, or `specs/` yet — two actions, small enough that git tags carry the
+version history. Add a changelog once tracking that by tag alone stops scaling.
 
 ## What this repo is
 
@@ -29,14 +29,11 @@ cross-org referencing actually needs.
 
 **Shipped (`v1`):** `setup-bun`, `setup-nextjs-bun`.
 
-**Designed, not yet built (`v2`):** `setup-go`, `setup-dotnet`, `upload-pages`. Each was
-scoped and adversarially reviewed during `v1`'s design pass but deferred — each has a
-genuinely small value proposition on its own (near-pure passthroughs of the underlying
-action's inputs, or a few lines saved across non-identical call sites) rather than being
-wrong. Pick one up by giving it its own directory following the conventions below; the
-original design reasoning lives in this repo's project history if it needs recovering, but
-don't treat old reasoning as binding — re-verify against the fleet's current state before
-building, the same way `v1` did.
+**Designed, not yet built (`v2`):** `setup-go`, `setup-dotnet`, `upload-pages`. Deferred, not
+wrong — each has a genuinely small value proposition on its own (near-pure passthroughs of the
+underlying action's inputs, or a few lines saved across non-identical call sites). Pick one up
+by giving it its own directory following the conventions below; re-verify the design against
+the fleet's current state before building rather than trusting old design notes as binding.
 
 ## Conventions every action here follows
 
@@ -56,10 +53,9 @@ building, the same way `v1` did.
 - **A value that may legitimately contain multiple space-separated tokens** (e.g.
   `install-args`, `playwright-browsers`) is *branched* on empty vs non-empty, not
   interpolated bare — an empty value word-splits or throws depending on the downstream CLI's
-  own argument parsing, which is exactly what broke `setup-bun`'s first `playwright-browsers`
-  draft (see git history: it shipped build-broken for every default-path consumer until an
-  adversarial audit caught it empirically). Where the non-empty branch does intentionally
-  rely on word-splitting a multi-token value, mark it explicitly:
+  own argument parsing, breaking every default-path consumer that leaves the input unset.
+  Where the non-empty branch does intentionally rely on word-splitting a multi-token value,
+  mark it explicitly:
 
   ```bash
   # VALUE may hold multiple space-separated tokens; word-splitting is intentional.
@@ -105,17 +101,15 @@ to get wrong when writing that kind of test:
   (`${{ runner.os }}-bun-`) so unrelated projects on the same runner OS warm-start each
   other's Bun install-store cache — a deliberate design choice, not an oversight. This means
   a "cold" self-test job can legitimately see `cache-hit: 'false'` if a *different* fixture's
-  job saved its cache first in a parallel run — real, observed 2026-08-14, not theoretical.
-  Assert `!= 'true'` on a cold run (rules out a stale exact-match surviving the cache reset),
-  never emptiness (rules out the intentional, racy, harmless partial-match case too).
+  job saved its cache first in a parallel run. Assert `!= 'true'` on a cold run (rules out a
+  stale exact-match surviving the cache reset), never emptiness (rules out the intentional,
+  racy, harmless partial-match case too).
 
 ## The one design decision worth understanding before touching `setup-nextjs-bun`
 
 It does not compose `setup-bun`, even though GitHub's `$/` self-repository reference syntax
-(an action referencing a sibling action in the same repo, added 2026-07-30) would let it.
-`$/` itself works correctly for this — verified directly against GitHub's docs, not just the
-changelog. The reason not to use it here: nesting composite actions triggers a still-open
-runner bug ([actions/runner#2009](https://github.com/actions/runner/issues/2009),
+(an action referencing a sibling action in the same repo) would let it. The reason not to use
+it here: nesting composite actions triggers a still-open runner bug ([actions/runner#2009](https://github.com/actions/runner/issues/2009),
 [#2030](https://github.com/actions/runner/issues/2030)) affecting an *expression-valued*
 `path:` on `actions/cache` at nesting depth ≥2 — the cache key itself is unaffected (cached in
 job state, not re-evaluated at post time), but the path can fail to resolve when the post step
@@ -141,10 +135,9 @@ a public answer.
 
 ## Why `oven-sh/setup-bun` and not a hand-rolled install
 
-The one non-`actions/*` dependency in this repo. Verified before keeping it: `oven-sh` is the
-same org that publishes Bun itself (not an unrelated third party), `setup-bun` is actively
-maintained and SHA-pins its own dependencies internally, and it does real work that would
-have to be reimplemented to drop it — Windows needs a genuinely different install mechanism
+The one non-`actions/*` dependency in this repo. `oven-sh` is the same org that publishes Bun
+itself (not an unrelated third party), `setup-bun` is actively maintained and SHA-pins its own
+dependencies internally, and it does real work that would have to be reimplemented to drop it — Windows needs a genuinely different install mechanism
 than Linux/macOS, and this repo's own `bun-version-file` fallback (reading a version from
 `package.json`'s `packageManager` field) is exactly the resolution logic `setup-bun` already
 implements. A bare `curl | bash` alternative would also be a supply-chain *regression*: a
