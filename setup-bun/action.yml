@@ -1,8 +1,7 @@
 name: Setup Bun
 description: >
-  Install Bun, restore its install-store cache, optionally restore an extra caller-defined
-  cache (e.g. a framework build cache), optionally install a Node.js runtime alongside Bun,
-  optionally install Playwright browsers, then run `bun install`.
+  Install Bun, restore its install-store cache, optionally install a Node.js runtime alongside
+  Bun, optionally install Playwright browsers, then run `bun install`.
 
 inputs:
   bun-version:
@@ -22,24 +21,12 @@ inputs:
       that default.
     required: false
     default: ""
-  extra-cache-paths:
-    description: >
-      Additional newline-separated paths to cache/restore beyond the Bun install store.
-      Requires extra-cache-key to also be set.
-    required: false
-    default: ""
-  extra-cache-key:
-    description: Cache key fragment for extra-cache-paths.
-    required: false
-    default: ""
-  extra-cache-restore-key-fragment:
-    description: >
-      Restore-key fragment for the extra cache (e.g. a lockfile hash) — this action prepends
-      its own prefix, so pass only the fragment, not the full restore-key string.
-    required: false
-    default: ""
   install-playwright:
-    description: When true, installs Playwright browsers (no caching — see README).
+    description: >
+      When true, installs Playwright browsers (no caching — see README). Runs regardless of
+      skip-install — bunx fetches Playwright standalone, no node_modules required — but when
+      combined with skip-install, the fetched version isn't pinned to the project's own
+      devDependency (no bun install has run yet to pin it).
     required: false
     default: "false"
   playwright-browsers:
@@ -83,7 +70,7 @@ runs:
       uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
         bun-version: ${{ inputs.bun-version }}
-        bun-version-file: ${{ inputs.bun-version == '' && format('{0}/package.json', inputs.working-directory) || '' }}
+        bun-version-file: ${{ inputs.bun-version == '' && inputs.skip-install != 'true' && format('{0}/package.json', inputs.working-directory) || '' }}
 
     - name: Verify lockfile exists
       if: inputs.skip-install != 'true'

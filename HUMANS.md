@@ -26,10 +26,6 @@ Generic Bun toolchain + install + cache. No framework assumptions.
     # node-version: "22"               # opt-in Node runtime alongside Bun
     # install-playwright: "true"
     # playwright-browsers: chromium    # scope the Playwright install; empty = install everything
-    # extra-cache-paths: |             # an additional cache, independently keyed
-    #   frontend/.some-build-cache
-    # extra-cache-key: ${{ hashFiles('frontend/**/*.ts') }}
-    # extra-cache-restore-key-fragment: ${{ hashFiles('frontend/bun.lock') }}
 ```
 
 Output: `cache-hit` — whether the Bun install-store cache was hit.
@@ -54,8 +50,8 @@ One Next.js app per call — for a repo with multiple Next apps, call this once 
 - uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1
   with:
     working-directory: frontend
-    # same optional inputs as setup-bun: bun-version, install-args, node-version,
-    # install-playwright, playwright-browsers
+    # same optional inputs as setup-bun: bun-version, node-version, install-playwright,
+    # playwright-browsers
 ```
 
 **Bun workspace / monorepo**, where `bun install` must run at the workspace root but the
@@ -75,7 +71,8 @@ Output: `cache-hit` — whether the Bun install-store cache was hit.
 
 ### `setup-go`
 
-Go toolchain via `actions/setup-go`, with its built-in module/build cache enabled.
+Go toolchain via `actions/setup-go`, with its built-in module/build cache enabled. Optionally
+also runs golangci-lint and/or govulncheck as a gate on the same job — opt-in, off by default.
 
 ```yaml
 - uses: actions/checkout@v7
@@ -87,6 +84,27 @@ Go toolchain via `actions/setup-go`, with its built-in module/build cache enable
 ```
 
 Outputs: `go-version`, `cache-hit`.
+
+**Lint + vuln gate** — both run from the same directory `go-version-file`/`cache-dependency-path`
+already names (no separate `working-directory` input needed), each `continue-on-error` behind
+a final gate step, so enabling both still surfaces both findings even if one fails:
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-go@v1
+  with:
+    run-lint: "true"
+    # lint-version: v2.12.2          # default: fleet-latest as of this writing
+    # lint-args: --timeout 5m
+    # lint-install-only: "true"      # only install the binary; a caller's own Makefile lints
+    run-govulncheck: "true"
+    # govulncheck-version: v1.7.0    # default: fleet-latest as of this writing
+    # govulncheck-args: -tags=foo
+```
+
+Doesn't fit every caller — a custom JSON-output/non-fatal gating script, or a job-level
+`CGO_ENABLED`/`PKG_CONFIG_PATH` build-tag requirement (job-level `env:` reaches these steps
+fine; it's the invocation shape itself, e.g. raw `-json` output, that doesn't map to an input)
+— those callers just leave `run-lint`/`run-govulncheck` off and keep their own step.
 
 ### Coming later
 

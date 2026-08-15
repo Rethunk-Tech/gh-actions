@@ -1,6 +1,8 @@
 name: Setup Go
 description: >
   Install a Go toolchain via actions/setup-go, with its built-in module/build cache enabled.
+  Optionally also run golangci-lint and/or govulncheck as a gate on the same job — opt-in, off
+  by default.
 
 inputs:
   go-version:
@@ -13,7 +15,9 @@ inputs:
     description: >
       Path to the go.mod (or go.work) file to resolve the Go version from. Only used when
       go-version is empty. May point into a subdirectory (e.g. "backend/go.mod") when the
-      module isn't at the checkout root.
+      module isn't at the checkout root — the lint/govulncheck steps below run from that same
+      subdirectory automatically, with no separate working-directory input: every real fleet
+      case that needs one needs the exact directory go-version-file already names.
     required: false
     default: go.mod
   cache-dependency-path:
@@ -21,6 +25,41 @@ inputs:
       Passthrough to actions/setup-go's cache-dependency-path — glob(s) used to build the
       module cache key. Leave empty to use actions/setup-go's own default (the resolved
       go.sum next to go-version-file).
+    required: false
+    default: ""
+  run-lint:
+    description: >
+      When true, runs golangci-lint via golangci-lint-action after the toolchain is set up.
+      Turns this action into a job gate for callers who opt in — off by default.
+    required: false
+    default: "false"
+  lint-version:
+    description: golangci-lint version to install. Fleet-latest as of this writing.
+    required: false
+    default: v2.12.2
+  lint-args:
+    description: Extra args for golangci-lint (e.g. --timeout 5m, --build-tags=foo).
+    required: false
+    default: ""
+  lint-install-only:
+    description: >
+      Passthrough to golangci-lint-action's install-only — when true, only installs the
+      golangci-lint binary onto PATH without running it (for a caller whose own Makefile or
+      script invokes it, so lint flags stay single-sourced there).
+    required: false
+    default: "false"
+  run-govulncheck:
+    description: >
+      When true, runs govulncheck (via `go run`, no binary left installed) after the toolchain
+      is set up. Turns this action into a job gate for callers who opt in — off by default.
+    required: false
+    default: "false"
+  govulncheck-version:
+    description: govulncheck version to run. Fleet-latest as of this writing.
+    required: false
+    default: v1.7.0
+  govulncheck-args:
+    description: Extra args for govulncheck before the scanned path (e.g. -tags=foo).
     required: false
     default: ""
 
@@ -37,9 +76,93 @@ runs:
   steps:
     - name: Setup Go
       id: setup-go
-      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.6.0
+      uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: ${{ inputs.go-version }}
         go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
         cache: true
         cache-dependency-path: ${{ inputs.cache-dependency-path }}
+
+    # Derives the module directory from cache-dependency-path or go-version-file rather than
+    # taking a separate working-directory input — every real fleet caller's lint/govulncheck
+    # directory is exactly one of these two paths' own dirname, never something else, so a
+    # second input would only ever duplicate what this one step already computes.
+    # cache-dependency-path wins when both are set: a caller that pins an explicit go-version
+    # (global-ai-alliance) leaves go-version-file at its "go.mod" default, which would resolve
+    # to the wrong (checkout-root) directory — cache-dependency-path is the one that actually
+    # names the module's real location in that case.
+    - name: Resolve module directory
+      id: moddir
+      if: inputs.run-lint == 'true' || inputs.run-govulncheck == 'true'
+      shell: bash
+      env:
+        GO_VERSION_FILE: ${{ inputs.go-version-file }}
+        CACHE_DEPENDENCY_PATH: ${{ inputs.cache-dependency-path }}
+      run: |
+        if [ -n "$CACHE_DEPENDENCY_PATH" ]; then
+          path="$CACHE_DEPENDENCY_PATH"
+        else
+          path="$GO_VERSION_FILE"
+        fi
+        # A multi-line (multi-module) or glob value has no single dirname — dirname would
+        # silently truncate it or write a malformed multi-line $GITHUB_OUTPUT record. No real
+        # caller passes either today; fail loudly rather than derive a wrong directory.
+        case "$path" in
+          *$'\n'*|*'*'*)
+            echo "::error::run-lint/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave run-lint/run-govulncheck off for this caller." >&2
+            exit 1
+            ;;
+        esac
+        echo "dir=$(dirname "$path")" >> "$GITHUB_OUTPUT"
+
+    # Both gates below run with continue-on-error: true and report through the final gate step
+    # rather than failing fast — a caller with both enabled sees BOTH findings in one run,
+    # matching what bastion-intent-ledger-replicator/BoundMCP already get from running lint and
+    # govulncheck as independent jobs today. A masked continue-on-error failure still shows its
+    # own warning icon in the Actions UI, so each tool's result stays individually visible.
+    - name: golangci-lint
+      id: lint
+      if: inputs.run-lint == 'true'
+      continue-on-error: true
+      uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+      with:
+        version: ${{ inputs.lint-version }}
+        args: ${{ inputs.lint-args }}
+        working-directory: ${{ steps.moddir.outputs.dir }}
+        install-only: ${{ inputs.lint-install-only }}
+
+    - name: govulncheck
+      id: govulncheck
+      if: inputs.run-govulncheck == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ steps.moddir.outputs.dir }}
+      env:
+        GOVULNCHECK_VERSION: ${{ inputs.govulncheck-version }}
+        GOVULNCHECK_ARGS: ${{ inputs.govulncheck-args }}
+      run: |
+        if [ -n "$GOVULNCHECK_ARGS" ]; then
+          # GOVULNCHECK_ARGS may hold multiple space-separated flags; word-splitting is intentional.
+          # shellcheck disable=SC2086
+          go run "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION" $GOVULNCHECK_ARGS ./...
+        else
+          go run "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION" ./...
+        fi
+
+    - name: Gate on lint/govulncheck results
+      if: inputs.run-lint == 'true' || inputs.run-govulncheck == 'true'
+      shell: bash
+      env:
+        LINT_OUTCOME: ${{ steps.lint.outcome }}
+        VULN_OUTCOME: ${{ steps.govulncheck.outcome }}
+      run: |
+        failed=0
+        if [ "$LINT_OUTCOME" = "failure" ]; then
+          echo "::error::golangci-lint found issues — see the golangci-lint step above" >&2
+          failed=1
+        fi
+        if [ "$VULN_OUTCOME" = "failure" ]; then
+          echo "::error::govulncheck found vulnerabilities — see the govulncheck step above" >&2
+          failed=1
+        fi
+        exit "$failed"

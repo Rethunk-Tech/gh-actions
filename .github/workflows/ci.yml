@@ -192,3 +192,44 @@ jobs:
             echo "::error::expected cache-hit=true on warm run, got '$CACHE_HIT'" >&2
             exit 1
           fi
+
+  test-setup-go-lint-vuln-pass:
+    name: setup-go self-test (lint + govulncheck, clean fixture)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-app/go.mod
+          run-lint: "true"
+          run-govulncheck: "true"
+
+  # Proves two things: the lint gate actually fires rather than silently no-op'ing — a fixture
+  # with a real errcheck violation (os.Open's error return discarded), confirmed locally to
+  # compile clean but fail `golangci-lint run` before this job existed — and that govulncheck
+  # still runs (continue-on-error on each internal step) even though lint already failed, so a
+  # caller with both enabled sees both findings in one run rather than losing govulncheck's
+  # result to lint's fail-fast. The outer continue-on-error captures the composite step's own
+  # outcome instead of letting it fail the job, so the assertion step can check it.
+  test-setup-go-lint-catches-real-issue:
+    name: setup-go self-test (lint gate fires, govulncheck still runs anyway)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-app-broken/go.mod
+          run-lint: "true"
+          run-govulncheck: "true"
+      - name: assert the lint step actually failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::expected the lint gate to fail on a known-bad fixture, got outcome '$OUTCOME'" >&2
+            exit 1
+          fi

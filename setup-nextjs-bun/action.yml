@@ -27,10 +27,6 @@ inputs:
       working-directory (the single-app case).
     required: false
     default: ""
-  install-args:
-    description: Extra args for `bun install` (e.g. --no-frozen-lockfile).
-    required: false
-    default: ""
   install-playwright:
     description: When true, installs Playwright browsers (no caching — see README).
     required: false
@@ -105,16 +101,7 @@ runs:
     - name: bun install
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      env:
-        INSTALL_ARGS: ${{ inputs.install-args }}
-      run: |
-        if [ -n "$INSTALL_ARGS" ]; then
-          # INSTALL_ARGS may hold multiple space-separated flags; word-splitting is intentional.
-          # shellcheck disable=SC2086
-          bun install $INSTALL_ARGS
-        else
-          bun install
-        fi
+      run: bun install
 
     - name: Install Playwright
       if: inputs.install-playwright == 'true'

@@ -48,9 +48,18 @@ the fleet's current state before building rather than trusting old design notes 
 
 - **No `actions/checkout`.** The caller does that first, before the `uses:` line — standard
   composite-action convention.
-- **No lint/build/test steps.** Those are project-defined commands that vary too much per
-  repo to centralize; stays the caller's own job step. An action here owns "get a pinned
-  toolchain installed and its dependencies cached," never a project-defined verb.
+- **No build/test steps** — those are project-defined commands that vary too much per repo to
+  centralize; stays the caller's own job step. **Lint/security-gate steps are the one
+  deliberate exception** (`setup-go`'s opt-in `run-lint`/`run-govulncheck`, off by default):
+  unlike build/test, every real fleet caller invokes the exact same two tools
+  (`golangci-lint-action`, `govulncheck`) with only their version/args/mode varying — real
+  passthrough inputs, not a project-defined verb — and centralizing them converges the fleet
+  onto one reviewed SHA pin instead of ~15 independently-drifting ones. Each such gate runs
+  with `continue-on-error: true` behind a final gate step (never plain fail-fast) so enabling
+  more than one still surfaces every finding in one run. A caller whose exact invocation
+  doesn't fit (custom JSON-gating, non-cancelling separate jobs by design) just doesn't set the
+  input and keeps its own step — this exception doesn't extend to a project's actual
+  build/test commands, which stay out per the rule above.
 - **Every wrapped action is SHA-pinned** with a `# vX.Y.Z` comment. `repo-ops`'s
   `--actions-refresh-sha` sweep keeps these current within a major; a wrapped action's major
   bump is a manual, reviewed change here.

@@ -5,5 +5,9 @@
 # Fixture-generated deps, not part of the fixture itself.
 .github/test-fixtures/**/node_modules/
 
+# Compiled binaries left behind by local `go build`/`go test` runs against a Go fixture.
+.github/test-fixtures/**/*-test-fixture*
+.github/test-fixtures/**/*-broken
+
 # Local agent/editor settings. Nothing here is shared.
 .claude/
