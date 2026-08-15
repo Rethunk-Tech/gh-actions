@@ -22,9 +22,10 @@ inputs:
     default: go.mod
   cache-dependency-path:
     description: >
-      Passthrough to actions/setup-go's cache-dependency-path — glob(s) used to build the
-      module cache key. Leave empty to use actions/setup-go's own default (the resolved
-      go.sum next to go-version-file).
+      Glob(s) used to build the module cache key, passed to actions/setup-go. Leave empty to
+      default to go-version-file itself — NOT actions/setup-go's own built-in default, which
+      only ever checks for a bare go.mod at the checkout root and silently fails to cache for
+      any module in a subdirectory (verified against real CI logs, not just its docs).
     required: false
     default: ""
   run-lint:
@@ -81,7 +82,13 @@ runs:
         go-version: ${{ inputs.go-version }}
         go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
         cache: true
-        cache-dependency-path: ${{ inputs.cache-dependency-path }}
+        # actions/setup-go's own empty-cache-dependency-path auto-discovery only ever checks
+        # for a literal go.mod at the WORKSPACE ROOT — it never looks next to go-version-file,
+        # so it silently fails ("Restore cache failed: Dependencies file is not found...") for
+        # every caller whose module lives in a subdirectory, which is most of the fleet. Falls
+        # back to go-version-file itself (not a guessed go.sum path) since that file always
+        # exists by construction, unlike a go.sum a zero-external-dependency module never had.
+        cache-dependency-path: ${{ inputs.cache-dependency-path != '' && inputs.cache-dependency-path || inputs.go-version-file }}
 
     # Derives the module directory from cache-dependency-path or go-version-file rather than
     # taking a separate working-directory input — every real fleet caller's lint/govulncheck

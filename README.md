@@ -12,14 +12,14 @@
 
 Shared composite GitHub Actions for the fleet — public, not Marketplace-listed, referenced
 directly from any repo in any org via `uses: Rethunk-Tech/gh-actions/<action>@<ref>`. Built to
-replace copy-pasted Bun/Next.js toolchain-setup and dependency-caching boilerplate that was
+replace copy-pasted Bun/Next.js/Go toolchain-setup and dependency-caching boilerplate that was
 drifting independently per repo across the fleet.
 
 ## Quick start
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.4
   with:
     working-directory: frontend
 ```
@@ -36,6 +36,8 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   documented CI caching guide (lockfile hash + source-file hash, independently invalidated).
 - `setup-go` wraps `actions/setup-go`'s own module/build cache — no hand-rolled cache key to
   keep in sync with upstream's.
+- `setup-go` also bundles opt-in golangci-lint/govulncheck gates, each `continue-on-error`
+  behind a final gate step — enabling both still surfaces both findings even if one fails.
 - Every wrapped dependency is SHA-pinned with a version comment; `repo-ops`'s
   `--actions-refresh-sha` sweep keeps pins current fleet-wide.
 - Actually tested, not just schema-checked: each action runs end-to-end via `act` before a
