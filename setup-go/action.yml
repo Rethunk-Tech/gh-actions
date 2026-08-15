@@ -2,7 +2,7 @@ name: Setup Go
 description: >
   Install a Go toolchain via actions/setup-go, with its built-in module/build cache enabled.
   Optionally also run golangci-lint and/or govulncheck as a gate on the same job — opt-in, off
-  by default.
+  by default. Writes a pass/fail table to the job's step summary.
 
 inputs:
   go-version:
@@ -156,13 +156,39 @@ runs:
           go run "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION" ./...
         fi
 
+    # Writes a plain pass/fail table to the job's step summary (the Actions UI "Summary" tab)
+    # — every caller gets at-a-glance visibility without parsing step logs. Deliberately NOT a
+    # severity-tiered/JSON-parsed report: that's real per-caller business logic (e.g. citadel's
+    # own vuln-gate.sh auto-files GitHub issues per CVE) this generic fleet action has no
+    # business opinionating about. A caller that wants that keeps its own downstream step
+    # reading govulncheck's `-json` output directly instead of enabling run-govulncheck here.
     - name: Gate on lint/govulncheck results
       if: inputs.run-lint == 'true' || inputs.run-govulncheck == 'true'
       shell: bash
       env:
+        RUN_LINT: ${{ inputs.run-lint }}
+        RUN_VULN: ${{ inputs.run-govulncheck }}
         LINT_OUTCOME: ${{ steps.lint.outcome }}
         VULN_OUTCOME: ${{ steps.govulncheck.outcome }}
       run: |
+        row() {
+          local enabled="$1" outcome="$2" label="$3"
+          if [ "$enabled" != 'true' ]; then
+            echo "| $label | — not run |" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$outcome" = "failure" ]; then
+            echo "| $label | ❌ fail |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| $label | ✅ pass |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        }
+        {
+          echo "## setup-go lint/vuln gate"
+          echo "| Check | Result |"
+          echo "| --- | --- |"
+        } >> "$GITHUB_STEP_SUMMARY"
+        row "$RUN_LINT" "$LINT_OUTCOME" "golangci-lint"
+        row "$RUN_VULN" "$VULN_OUTCOME" "govulncheck"
+
         failed=0
         if [ "$LINT_OUTCOME" = "failure" ]; then
           echo "::error::golangci-lint found issues — see the golangci-lint step above" >&2
