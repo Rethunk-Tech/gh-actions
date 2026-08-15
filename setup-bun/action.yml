@@ -23,10 +23,15 @@ inputs:
     default: ""
   install-playwright:
     description: >
-      When true, installs Playwright browsers (no caching — see README). Runs regardless of
-      skip-install — bunx fetches Playwright standalone, no node_modules required — but when
-      combined with skip-install, the fetched version isn't pinned to the project's own
-      devDependency (no bun install has run yet to pin it).
+      When true, installs Playwright browsers, caching them by the resolved @playwright/test
+      (or playwright) version in working-directory/package.json — a version bump invalidates
+      the cache outright rather than partially restoring a stale browser build, matching
+      Playwright's own documented CI caching guide. Runs regardless of skip-install — bunx
+      fetches Playwright standalone, no node_modules required — but when combined with
+      skip-install, the fetched version isn't pinned to the project's own devDependency (no
+      bun install has run yet to pin it), and no package.json may exist to resolve a version
+      from at all — in that case the cache key falls back to "unpinned" (still caches, just
+      not invalidated by a version bump you'd have no devDependency to see anyway).
     required: false
     default: "false"
   playwright-browsers:
@@ -56,6 +61,9 @@ outputs:
   cache-hit:
     description: Whether the Bun install-store cache was hit.
     value: ${{ steps.bun-cache.outputs.cache-hit }}
+  playwright-cache-hit:
+    description: Whether the Playwright browser cache was hit (empty when install-playwright is off).
+    value: ${{ steps.playwright-cache.outputs.cache-hit }}
 
 runs:
   using: composite
@@ -117,8 +125,35 @@ runs:
           bun install
         fi
 
-    - name: Install Playwright
+    # Version-keyed rather than lockfile-keyed on purpose: Playwright's own CI caching guide
+    # keys on the @playwright/test devDependency version specifically, because a browser build
+    # must match the exact npm package version — a partial restore-keys match would silently
+    # reuse a browser build that doesn't match a newer package. Falls back to "unpinned" (no
+    # cache invalidation on a version bump, but still caches) when no package.json exists at
+    # all, e.g. skip-install with no project of its own.
+    - name: Resolve Playwright version
+      id: playwright-version
       if: inputs.install-playwright == 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -f package.json ]; then
+          version=$(node -p "const p=require('./package.json'); (p.devDependencies&&p.devDependencies['@playwright/test'])||(p.dependencies&&p.dependencies['@playwright/test'])||(p.devDependencies&&p.devDependencies.playwright)||(p.dependencies&&p.dependencies.playwright)||'unpinned'" 2>/dev/null || echo unpinned)
+        else
+          version=unpinned
+        fi
+        echo "version=$version" >> "$GITHUB_OUTPUT"
+
+    - name: Cache Playwright browsers
+      id: playwright-cache
+      if: inputs.install-playwright == 'true'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+
+    - name: Install Playwright
+      if: inputs.install-playwright == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
       shell: bash
       env:
         PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
@@ -129,4 +164,19 @@ runs:
           bunx playwright install --with-deps $PLAYWRIGHT_BROWSERS
         else
           bunx playwright install --with-deps
+        fi
+
+    # Browsers themselves are already cached above — only the OS-level dependencies (apt
+    # packages, not part of the cached path) still need installing on a cache hit.
+    - name: Install Playwright system deps (browsers cached)
+      if: inputs.install-playwright == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
+      shell: bash
+      env:
+        PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
+      run: |
+        if [ -n "$PLAYWRIGHT_BROWSERS" ]; then
+          # shellcheck disable=SC2086
+          bunx playwright install-deps $PLAYWRIGHT_BROWSERS
+        else
+          bunx playwright install-deps
         fi

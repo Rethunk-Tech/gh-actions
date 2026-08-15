@@ -38,6 +38,8 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   keep in sync with upstream's.
 - `setup-go` also bundles opt-in golangci-lint/govulncheck gates, each `continue-on-error`
   behind a final gate step — enabling both still surfaces both findings even if one fails.
+- `install-playwright` (`setup-bun`/`setup-nextjs-bun`) caches browsers by the resolved
+  `@playwright/test` version, matching Playwright's own documented CI caching guide.
 - Every wrapped dependency is SHA-pinned with a version comment; `repo-ops`'s
   `--actions-refresh-sha` sweep keeps pins current fleet-wide.
 - Actually tested, not just schema-checked: each action runs end-to-end via `act` before a

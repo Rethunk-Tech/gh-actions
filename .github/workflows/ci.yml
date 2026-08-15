@@ -50,13 +50,13 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Delete Linux-bun-* and Linux-nextjs-* caches for this ref
+      - name: Delete Linux-bun-*, Linux-nextjs-*, setup-go-Linux-*, playwright-Linux-* caches for this ref
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # --ref cannot be combined with a numeric cache ID (only with a key string). IDs are
           # already unambiguous, so no --ref is needed on the delete call itself.
-          for prefix in Linux-bun- Linux-nextjs- setup-go-Linux-; do
+          for prefix in Linux-bun- Linux-nextjs- setup-go-Linux- playwright-Linux-; do
             for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id'); do
               gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
             done
@@ -190,6 +190,52 @@ jobs:
         run: |
           if [ "$CACHE_HIT" != "true" ]; then
             echo "::error::expected cache-hit=true on warm run, got '$CACHE_HIT'" >&2
+            exit 1
+          fi
+
+  test-setup-bun-playwright-cold:
+    name: setup-bun self-test (Playwright cache, cold)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app-playwright
+          install-playwright: "true"
+          playwright-browsers: chromium
+      - name: assert browser installed and no exact cache hit
+        env:
+          PW_CACHE_HIT: ${{ steps.setup.outputs.playwright-cache-hit }}
+        run: |
+          if [ ! -d ~/.cache/ms-playwright ] || [ -z "$(ls -A ~/.cache/ms-playwright)" ]; then
+            echo "::error::expected Playwright browsers installed under ~/.cache/ms-playwright" >&2
+            exit 1
+          fi
+          if [ "$PW_CACHE_HIT" = "true" ]; then
+            echo "::error::expected no exact Playwright cache-hit on cold run, got 'true'" >&2
+            exit 1
+          fi
+
+  test-setup-bun-playwright-warm:
+    name: setup-bun self-test (Playwright cache, warm)
+    needs: test-setup-bun-playwright-cold
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app-playwright
+          install-playwright: "true"
+          playwright-browsers: chromium
+      - name: assert Playwright cache-hit true
+        env:
+          PW_CACHE_HIT: ${{ steps.setup.outputs.playwright-cache-hit }}
+        run: |
+          if [ "$PW_CACHE_HIT" != "true" ]; then
+            echo "::error::expected Playwright cache-hit=true on warm run, got '$PW_CACHE_HIT'" >&2
             exit 1
           fi
 
