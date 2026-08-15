@@ -18,7 +18,7 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.4
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.5
   with:
     working-directory: frontend        # default: .
     # bun-version: "1.3.14"            # default: resolved from package.json's packageManager
@@ -35,7 +35,7 @@ to put a `bun` binary on PATH), or one that must run `bun install` itself later 
 setup steps that have to happen first (e.g. cloning sibling repos for Bun `link:` resolution):
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.4
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.5
   with:
     skip-install: "true"     # only installs the bun binary; no lockfile check, cache, or install
 ```
@@ -47,7 +47,7 @@ One Next.js app per call — for a repo with multiple Next apps, call this once 
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.4
+- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.5
   with:
     working-directory: frontend
     # same optional inputs as setup-bun: bun-version, node-version, install-playwright,
@@ -59,7 +59,7 @@ Next app itself lives in a subdirectory (`.next/`, source files to hash for the 
 key) — set `next-app-directory` separately from `working-directory`:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.4
+- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.5
   with:
     working-directory: .                     # workspace root — bun install runs here
     next-app-directory: apps/dashboard        # the actual Next app — .next/cache lives here
@@ -76,7 +76,7 @@ also runs golangci-lint and/or govulncheck as a gate on the same job — opt-in,
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.4
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.5
   with:
     go-version-file: go.mod          # default; may point into a subdir, e.g. backend/go.mod
     # go-version: "1.26.5"           # exact version instead — overrides go-version-file
@@ -90,7 +90,7 @@ already names (no separate `working-directory` input needed), each `continue-on-
 a final gate step, so enabling both still surfaces both findings even if one fails:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.4
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.5
   with:
     run-lint: "true"
     # lint-version: v2.12.2          # default: fleet-latest as of this writing
@@ -113,13 +113,13 @@ for status.
 
 ## Pinning
 
-Tags here are **frozen point-releases** (`v1`, `v1.1`, ... `v1.4`, each a fixed commit,
+Tags here are **frozen point-releases** (`v1`, `v1.1`, ... `v1.5`, each a fixed commit,
 never retargeted) — not a rolling major alias the way `actions/checkout@v4` is upstream. Pin
-by the latest version tag for convenience (`@v1.4`), or by commit SHA with a version comment
+by the latest version tag for convenience (`@v1.5`), or by commit SHA with a version comment
 for maximum supply-chain hardening, matching how these actions pin their own dependencies:
 
 ```yaml
-uses: Rethunk-Tech/gh-actions/setup-bun@<sha> # v1.4
+uses: Rethunk-Tech/gh-actions/setup-bun@<sha> # v1.5
 ```
 
 Either way, check [the releases page](https://github.com/Rethunk-Tech/gh-actions/releases) for
@@ -127,7 +127,7 @@ the current tag — a bare `@v1` resolves to the very first `v1` commit, not the
 
 `repo-ops`'s `--actions-refresh-sha` sweep (Rethunk-Tech/repo-ops) keeps an existing **SHA**
 pin current within a major automatically; it has nothing to act on for a bare version-tag
-reference like `@v1.4` (there's no stale SHA in that reference for the sweep to find). Crossing
+reference like `@v1.5` (there's no stale SHA in that reference for the sweep to find). Crossing
 a major (`v1` → `v2`) needs `--actions-refresh-sha --latest`, and only ever applies to SHA
 pins either way.
 
