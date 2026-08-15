@@ -34,6 +34,16 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 
 Output: `cache-hit` — whether the Bun install-store cache was hit.
 
+**Toolchain only, no install** — a caller with no `package.json` of its own (bun used purely
+to put a `bun` binary on PATH), or one that must run `bun install` itself later after other
+setup steps that have to happen first (e.g. cloning sibling repos for Bun `link:` resolution):
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1
+  with:
+    skip-install: "true"     # only installs the bun binary; no lockfile check, cache, or install
+```
+
 ### `setup-nextjs-bun`
 
 Everything `setup-bun` does, plus a `.next/cache` build cache and `NEXT_TELEMETRY_DISABLED=1`.
