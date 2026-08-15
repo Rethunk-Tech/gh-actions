@@ -3,6 +3,7 @@
 <div align="center">
 
 [![CI](https://github.com/Rethunk-Tech/gh-actions/actions/workflows/ci.yml/badge.svg)](https://github.com/Rethunk-Tech/gh-actions/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/tag/Rethunk-Tech/gh-actions?label=release)](https://github.com/Rethunk-Tech/gh-actions/tags)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
