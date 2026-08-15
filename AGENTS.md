@@ -25,6 +25,15 @@ root-only/no-workflows repo constraint, and public-discoverability overhead for 
 functional gain over a plain public repo, which is all `uses: owner/repo/path@ref`
 cross-org referencing actually needs.
 
+**The goal is maintainable unity across the fleet, not preserving every repo's existing
+quirk.** An input earns a place here only when a real caller genuinely needs it (evidenced by
+grepping actual usage, never "this seems useful") — but the reverse also holds: standardizing
+a whole workflow file, or dropping a repo-specific step, is in scope even when it costs that
+one repo some bespoke behavior, if the fleet-wide result is easier to maintain. Don't treat
+"repo X currently does it differently" as a constraint to design around by default — treat it
+as a candidate for the fleet to converge on, and make that call explicitly rather than
+defaulting to preserving variance.
+
 ## Status
 
 **Shipped (`v1`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`.
