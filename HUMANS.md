@@ -102,7 +102,7 @@ a final gate step, so enabling both still surfaces both findings even if one fai
 ```
 
 Doesn't fit every caller — a custom JSON-output/non-fatal gating script, or a job-level
-`CGO_ENABLED`/`PKG_CONFIG_PATH` build-tag requirement (job-level `env:` reaches these steps
+CGO_ENABLED/PKG_CONFIG_PATH build-tag requirement (job-level `env:` reaches these steps
 fine; it's the invocation shape itself, e.g. raw `-json` output, that doesn't map to an input)
 — those callers just leave `run-lint`/`run-govulncheck` off and keep their own step.
 
@@ -125,11 +125,11 @@ uses: Rethunk-Tech/gh-actions/setup-bun@<sha> # v1.5
 Either way, check [the releases page](https://github.com/Rethunk-Tech/gh-actions/releases) for
 the current tag — a bare `@v1` resolves to the very first `v1` commit, not the latest `v1.x`.
 
-`repo-ops`'s `--actions-refresh-sha` sweep (Rethunk-Tech/repo-ops) keeps an existing **SHA**
-pin current within a major automatically; it has nothing to act on for a bare version-tag
-reference like `@v1.5` (there's no stale SHA in that reference for the sweep to find). Crossing
-a major (`v1` → `v2`) needs `--actions-refresh-sha --latest`, and only ever applies to SHA
-pins either way.
+The repo-ops actions-refresh-sha sweep ([Rethunk-Tech/repo-ops](https://github.com/Rethunk-Tech/repo-ops))
+keeps an existing **SHA** pin current within a major automatically; it has nothing to act on for a
+bare version-tag reference like `@v1.5` (there is no stale SHA in that reference for the sweep to
+find). Crossing a major (`v1` → `v2`) needs actions-refresh-sha with the latest option, and
+only ever applies to SHA pins either way.
 
 ## Reporting a problem
 

@@ -30,19 +30,19 @@ Conventional commits: `type(scope): subject`, e.g. `feat(setup-go): add Go toolc
 
 ## Adding a new action
 
-1. New directory at the repo root, `action.yml` inside it — not nested deeper.
-2. Follow the conventions in [AGENTS.md](AGENTS.md): no `checkout`, no lint/build/test steps,
-   every wrapped action SHA-pinned with a version comment, no bare `${{ inputs.* }}`
-   interpolation inside `run:`.
-3. Add a committed fixture under `.github/test-fixtures/` if the action needs one for CI
-   self-testing, and wire a cold/warm job pair into `.github/workflows/ci.yml` following the
-   existing `test-setup-bun-*` jobs as the template. If it shares a lockfile-based cache key
-   with another action's fixture, give it distinct fixture content (a different dependency)
-   so the cache keys don't collide across self-test jobs.
-4. Add a usage section to [HUMANS.md](HUMANS.md) — inputs worth knowing, an example snippet,
-   outputs.
-5. Tag a new version once it ships. This repo has no long-lived release branches — a fix or
-   addition ships in the next tag.
+- New directory at the repo root, `action.yml` inside it — not nested deeper.
+- Follow the conventions in [AGENTS.md](AGENTS.md): no `checkout`, no lint/build/test steps,
+  every wrapped action SHA-pinned with a version comment, no bare `${{ inputs.* }}`
+  interpolation inside `run:`.
+- Add a committed fixture under `.github/test-fixtures/` if the action needs one for CI
+  self-testing, and wire a cold/warm job pair into `.github/workflows/ci.yml` following the
+  existing `test-setup-bun-*` jobs as the template. If it shares a lockfile-based cache key
+  with another action's fixture, give it distinct fixture content (a different dependency) so
+  the cache keys do not collide across self-test jobs.
+- Add a usage section to [HUMANS.md](HUMANS.md) — inputs worth knowing, an example snippet,
+  outputs.
+- Tag a new version once it ships. This repo has no long-lived release branches — a fix or
+  addition ships in the next tag.
 
 ## Reporting a bug
 

@@ -60,9 +60,9 @@ the fleet's current state before building rather than trusting old design notes 
   doesn't fit (custom JSON-gating, non-cancelling separate jobs by design) just doesn't set the
   input and keeps its own step — this exception doesn't extend to a project's actual
   build/test commands, which stay out per the rule above.
-- **Every wrapped action is SHA-pinned** with a `# vX.Y.Z` comment. `repo-ops`'s
-  `--actions-refresh-sha` sweep keeps these current within a major; a wrapped action's major
-  bump is a manual, reviewed change here.
+- **Every wrapped action is SHA-pinned** with a `# vX.Y.Z` comment. The repo-ops
+  actions-refresh-sha sweep keeps these current within a major; a wrapped action's major bump
+  is a manual, reviewed change here.
 - **No inline `${{ inputs.* }}` interpolation inside a `run:` body.** Script-injection
   surface — GitHub's own hardening guidance warns against it. Every value goes in via `env:`
   and is referenced as a shell variable. `actions/upload-pages-artifact` (a first-party
@@ -104,38 +104,42 @@ to get wrong when writing that kind of test:
 - **`actions/cache` saves in the job's *post* phase, after every main step completes.**
   Calling an action that uses it twice within the *same job* will never see a hit on the
   second call — the first call's save hasn't happened yet. Test cold-vs-warm across two
-  *separate* job runs (a `needs:`-chained pair, or two separate `act` invocations sharing a
-  `--cache-server-path`), not two calls in one job.
+  *separate* job runs (a `needs:`-chained pair, or two separate act invocations sharing one
+  cache-server-path), not two calls in one job.
 - Locally, use a real fixture with a real `bun.lock` — `bun install` in a scratch directory
   generates one; don't hand-write a plausible-looking lockfile.
-- `act` needs Docker and a `--cache-server-path` to actually exercise `actions/cache` restore/
-  save; without it, cache steps are effectively no-ops in local testing.
+- act needs Docker and a persistent cache-server-path to actually exercise `actions/cache`
+  restore/save; without it, cache steps are effectively no-ops in local testing.
 - Any test fixture created for local iteration stays untracked/cleaned up before committing —
   `.github/test-fixtures/` is the one committed exception, used by `ci.yml`'s own self-test.
-- **`actions/cache`'s `cache-hit` output is tri-state, not boolean:** `''` (total miss —
-  neither the exact key nor any `restore-keys` prefix matched), `'false'` (a `restore-keys`
-  *partial* match restored something, but not the exact key), `'true'` (exact key match).
-  `setup-bun` and `setup-nextjs-bun` intentionally share the same `restore-keys` prefix
-  (`${{ runner.os }}-bun-`) so unrelated projects on the same runner OS warm-start each
-  other's Bun install-store cache — a deliberate design choice, not an oversight. This means
-  a "cold" self-test job can legitimately see `cache-hit: 'false'` if a *different* fixture's
-  job saved its cache first in a parallel run. Assert `!= 'true'` on a cold run (rules out a
-  stale exact-match surviving the cache reset), never emptiness (rules out the intentional,
-  racy, harmless partial-match case too).
+- **`actions/cache`'s `cache-hit` output is tri-state, not boolean:**
+
+  | Value | Meaning |
+  | --- | --- |
+  | `''` (empty) | Total miss — neither the exact key nor any `restore-keys` prefix matched |
+  | `'false'` | A `restore-keys` partial match restored something, but not the exact key |
+  | `'true'` | Exact key match |
+
+  `setup-bun` and `setup-nextjs-bun` share the same `restore-keys` prefix
+  (`${{ runner.os }}-bun-`) so unrelated projects warm-start each other's Bun install-store
+  cache.
+
+  On a cold self-test run, assert `cache-hit != 'true'` — not emptiness, which would reject
+  the harmless partial-match case when another fixture saved first in parallel.
 
 ## The one design decision worth understanding before touching `setup-nextjs-bun`
 
-It does not compose `setup-bun`, even though GitHub's `$/` self-repository reference syntax
-(an action referencing a sibling action in the same repo) would let it. The reason not to use
-it here: nesting composite actions triggers a still-open runner bug ([actions/runner#2009](https://github.com/actions/runner/issues/2009),
-[#2030](https://github.com/actions/runner/issues/2030)) affecting an *expression-valued*
-`path:` on `actions/cache` at nesting depth ≥2 — the cache key itself is unaffected (cached in
-job state, not re-evaluated at post time), but the path can fail to resolve when the post step
-runs, so the cache silently never saves. A runner maintainer's comment on #2009 states the bug
-is triggered specifically by a *local* (`uses: ./path`) composite reference and avoided by a
-*remote* one (`uses: owner/repo/path@ref`); whether `$/` counts as "local" for this purpose has
-no public answer yet. Given that ambiguity, `setup-nextjs-bun` duplicates `setup-bun`'s core
-steps instead of composing them.
+`setup-nextjs-bun` does not compose `setup-bun`, even though GitHub's `$/` syntax would allow
+it. Nesting composite actions triggers a still-open runner bug
+([actions/runner#2009](https://github.com/actions/runner/issues/2009),
+[#2030](https://github.com/actions/runner/issues/2030)): an expression-valued `path:` on
+`actions/cache` at nesting depth ≥2 can fail to resolve in the post step, so the cache never
+saves (the key itself is fine — cached in job state).
+
+A runner maintainer on #2009 says the bug is triggered by a local (`uses: ./path`) composite
+reference and avoided by a remote one (`uses: owner/repo/path@ref`); whether `$/` counts as
+local has no public answer yet. Given that ambiguity, `setup-nextjs-bun` duplicates
+`setup-bun`'s core steps instead of composing them.
 
 Two consequences that matter if you touch either action:
 
