@@ -28,6 +28,24 @@ jobs:
           uvx check-jsonschema --builtin-schema vendor.github-actions setup-nextjs-bun/action.yml
           uvx check-jsonschema --builtin-schema vendor.github-actions setup-go/action.yml
 
+      # Neither check above can see this: an `inputs.foo` that was never declared resolves to
+      # the empty string rather than erroring, so a step gated on one silently never runs.
+      # That shipped once, in setup-bun's extra-paths cache.
+      - name: Check every referenced input is declared
+        run: |
+          python3 - <<'EOF'
+          import re, sys, pathlib
+          bad = False
+          for f in sorted(pathlib.Path(".").glob("*/action.yml")):
+              t = f.read_text()
+              m = re.search(r"^inputs:\n(.*?)^(?=\w)", t, re.S | re.M)
+              declared = set(re.findall(r"^  ([\w-]+):", m.group(1), re.M)) if m else set()
+              for name in sorted(set(re.findall(r"inputs\.([\w-]+)", t)) - declared):
+                  print(f"::error file={f}::references undeclared input '{name}'")
+                  bad = True
+          sys.exit(1 if bad else 0)
+          EOF
+
       - name: Install actionlint
         run: |
           curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz" | tar xz actionlint
@@ -56,7 +74,7 @@ jobs:
         run: |
           # --ref cannot be combined with a numeric cache ID (only with a key string). IDs are
           # already unambiguous, so no --ref is needed on the delete call itself.
-          for prefix in Linux-bun- Linux-nextjs- setup-go-Linux- playwright-Linux-; do
+          for prefix in Linux-bun- Linux-nextjs- setup-go-Linux- playwright-Linux- Linux-bun-extra-; do
             for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id'); do
               gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
             done
@@ -111,6 +129,50 @@ jobs:
         run: |
           if [ "$CACHE_HIT" != "true" ]; then
             echo "::error::expected cache-hit=true on warm run, got '$CACHE_HIT'" >&2
+            exit 1
+          fi
+
+  # The extra-paths cache is the one cache in this action whose inputs are supplied entirely
+  # by the caller, so a self-test is the only thing that proves the wiring resolves at all —
+  # the three inputs it reads went undeclared for the life of the feature, which schema
+  # validation cannot catch (a reference to an undeclared input is empty, not invalid) and
+  # actionlint does not check for composite actions. Cold writes a marker into the extra path
+  # and lets the post step save it; warm asserts the marker came back.
+  test-setup-bun-extra-cache-cold:
+    name: setup-bun self-test (extra-paths cache, cold)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app
+          extra-cache-paths: .turbo-selftest
+          extra-cache-key: ${{ github.sha }}
+      - name: write the marker the warm job has to see
+        run: |
+          mkdir -p .turbo-selftest
+          echo "$GITHUB_SHA" > .turbo-selftest/marker
+
+  test-setup-bun-extra-cache-warm:
+    name: setup-bun self-test (extra-paths cache, warm)
+    needs: test-setup-bun-extra-cache-cold
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app
+          extra-cache-paths: .turbo-selftest
+          extra-cache-key: ${{ github.sha }}
+      - name: assert the extra path was restored
+        run: |
+          if [ ! -f .turbo-selftest/marker ]; then
+            echo "::error::extra-cache-paths did not restore .turbo-selftest/marker" >&2
+            exit 1
+          fi
+          if [ "$(cat .turbo-selftest/marker)" != "$GITHUB_SHA" ]; then
+            echo "::error::restored marker is not this run's, got '$(cat .turbo-selftest/marker)'" >&2
             exit 1
           fi
 

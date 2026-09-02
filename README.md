@@ -40,6 +40,8 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   behind a final gate step — enabling both still surfaces both findings even if one fails.
 - `install-playwright` (`setup-bun`/`setup-nextjs-bun`) caches browsers by the resolved
   `@playwright/test` version, matching Playwright's own documented CI caching guide.
+- `extra-cache-paths` (`setup-bun`) caches a build directory the repo owns alongside the
+  install store, on a caller-supplied key — for a Turborepo `.turbo` or similar.
 - Every wrapped dependency is SHA-pinned with a version comment; the repo-ops
   actions-refresh-sha sweep keeps pins current fleet-wide.
 - Actually tested, not just schema-checked: each action runs end-to-end via `act` before a

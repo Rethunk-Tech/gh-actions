@@ -30,6 +30,19 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 
 Output: `cache-hit` — whether the Bun install-store cache was hit.
 
+**Caching a build directory too** — a path the repo owns that should not be keyed on the
+lockfile, such as a Turborepo `.turbo`. Both inputs are required for the cache to run at all;
+leaving the restore fragment empty restores from any previous extra cache for this OS, which
+is what a SHA-keyed cache wants because its key never repeats:
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.5
+  with:
+    extra-cache-paths: .turbo
+    extra-cache-key: ${{ github.sha }}
+    # extra-cache-restore-key-fragment: ""   # default: match any earlier extra cache
+```
+
 **Toolchain only, no install** — a caller with no `package.json` of its own (bun used purely
 to put a `bun` binary on PATH), or one that must run `bun install` itself later after other
 setup steps that have to happen first (e.g. cloning sibling repos for Bun `link:` resolution):

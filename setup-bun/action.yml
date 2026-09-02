@@ -47,6 +47,29 @@ inputs:
       that shells out to `node`.
     required: false
     default: ""
+  extra-cache-paths:
+    description: >
+      Additional paths to cache beyond Bun's install store, in actions/cache `path` form
+      (newline-separated for more than one). Caching is skipped unless extra-cache-key is
+      also set. For build caches a repo owns but does not want to key on its lockfile —
+      a Turborepo .turbo directory, say.
+    required: false
+    default: ""
+  extra-cache-key:
+    description: >
+      Fragment appended to the extra-paths cache key, after `<os>-bun-extra-`. Make it
+      change whenever the cached content should be rebuilt — a commit SHA for a build
+      cache that should always save fresh, a hashFiles() for one keyed on its inputs.
+    required: false
+    default: ""
+  extra-cache-restore-key-fragment:
+    description: >
+      Fragment appended to the extra-paths restore-keys prefix, after `<os>-bun-extra-`.
+      Empty means restore from any previous extra cache for this OS, which is what a
+      SHA-keyed build cache wants — the key never repeats, so the prefix is the only
+      thing that can match.
+    required: false
+    default: ""
   skip-install:
     description: >
       When true, only installs the Bun binary onto PATH — skips lockfile verification, the
