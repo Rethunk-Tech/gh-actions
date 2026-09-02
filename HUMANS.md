@@ -21,7 +21,7 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 - uses: Rethunk-Tech/gh-actions/setup-bun@v1.5
   with:
     working-directory: frontend        # default: .
-    # bun-version: "1.3.14"            # default: resolved from package.json's packageManager
+    # bun-version: "1.4.0"            # default: resolved from package.json's packageManager
     # install-args: --no-frozen-lockfile
     # node-version: "22"               # opt-in Node runtime alongside Bun
     # install-playwright: "true"
