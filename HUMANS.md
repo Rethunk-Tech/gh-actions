@@ -120,7 +120,7 @@ fine; it's the invocation shape itself, e.g. raw `-json` output, that doesn't ma
 
 ### Coming later
 
-`setup-dotnet` and `upload-pages` are designed but not yet built — see [AGENTS.md](AGENTS.md)
+`upload-pages` is designed but not yet built — see [AGENTS.md](AGENTS.md)
 for status.
 
 ## Pinning

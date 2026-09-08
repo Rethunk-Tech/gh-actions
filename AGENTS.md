@@ -38,11 +38,15 @@ defaulting to preserving variance.
 
 **Shipped (`v1`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`.
 
-**Designed, not yet built (`v2`):** `setup-dotnet`, `upload-pages`. Deferred, not
-wrong — each has a genuinely small value proposition on its own (near-pure passthroughs of the
-underlying action's inputs, or a few lines saved across non-identical call sites). Pick one up
-by giving it its own directory following the conventions below; re-verify the design against
-the fleet's current state before building rather than trusting old design notes as binding.
+**Designed, not yet built (`v2`):** `upload-pages`. Deferred, not wrong — a near-pure
+passthrough saving a couple of lines, and it currently has exactly one caller
+(`Rethunk-AI/bakeoff-results`), which otherwise depends on nothing here. Revisit at a second
+caller. Pick it up by giving it its own directory following the conventions below; re-verify
+the design against the fleet's current state before building rather than trusting old design
+notes as binding.
+
+`setup-dotnet` was designed and dropped: no repository in any org has a `.csproj`/`.sln` with
+CI at all, so it fails this repo's own bar of a real caller evidenced by grepping usage.
 
 ## Conventions every action here follows
 
