@@ -176,6 +176,47 @@ jobs:
             exit 1
           fi
 
+  # skip-install must skip the install, not the install-store cache: its documented
+  # callers run `bun install` themselves after some other setup step and still want the
+  # cache. Chained off the warm job so the key is known to exist — before the fix this
+  # step was gated off entirely and cache-hit came back empty.
+  test-setup-bun-skip-install-cache:
+    name: setup-bun self-test (skip-install still caches)
+    needs: test-setup-bun-warm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app
+          skip-install: "true"
+      - name: assert the store was cached and the install was still skipped
+        env:
+          CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" != "true" ]; then
+            echo "::error::skip-install must not disable the install-store cache; expected cache-hit=true after the warm job, got '$CACHE_HIT'" >&2
+            exit 1
+          fi
+          if [ -d .github/test-fixtures/bun-app/node_modules ]; then
+            echo "::error::skip-install ran bun install anyway" >&2
+            exit 1
+          fi
+
+  # The genuinely project-less case: bun as a PATH tool, no bun.lock anywhere. Must not
+  # error on the missing lockfile — repo-ops calls exactly this.
+  test-setup-bun-skip-install-no-lockfile:
+    name: setup-bun self-test (skip-install, no project)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-bun
+        with:
+          working-directory: .github
+          skip-install: "true"
+      - run: bun --version
+
   test-setup-nextjs-bun-cold:
     name: setup-nextjs-bun self-test (cold cache)
     needs: reset-self-test-caches

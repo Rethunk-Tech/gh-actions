@@ -70,6 +70,15 @@ inputs:
       thing that can match.
     required: false
     default: ""
+  playwright-directory:
+    description: >
+      Directory whose package.json pins the Playwright version, and where the browser install
+      runs. Empty defaults to working-directory. Set it when the install root and the
+      Playwright app differ — a Bun workspace where `bun install` runs at the repo root but
+      the browsers must match apps/web's own @playwright/test, which is otherwise resolved
+      against the root package.json and cached under the wrong version.
+    required: false
+    default: ""
   skip-install:
     description: >
       When true, only installs the Bun binary onto PATH — skips lockfile verification, the
@@ -103,20 +112,30 @@ runs:
         bun-version: ${{ inputs.bun-version }}
         bun-version-file: ${{ inputs.bun-version == '' && inputs.skip-install != 'true' && format('{0}/package.json', inputs.working-directory) || '' }}
 
-    - name: Verify lockfile exists
-      if: inputs.skip-install != 'true'
+    # The install-store cache is gated on the lockfile existing, not on skip-install:
+    # skip-install's whole documented purpose is a caller that runs `bun install` itself
+    # after some other setup step, and that caller still wants the cache. Only the
+    # genuinely project-less case (bun as a PATH tool, no bun.lock at all) skips it.
+    - name: Verify lockfile
+      id: lockfile
       shell: bash
       env:
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        SKIP_INSTALL: ${{ inputs.skip-install }}
       run: |
-        if [ ! -f "$WORKING_DIRECTORY/bun.lock" ]; then
-          echo "::error::$WORKING_DIRECTORY/bun.lock not found — refusing to build a cache key from a missing lockfile" >&2
-          exit 1
+        if [ -f "$WORKING_DIRECTORY/bun.lock" ]; then
+          echo "present=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "present=false" >> "$GITHUB_OUTPUT"
+          if [ "$SKIP_INSTALL" != "true" ]; then
+            echo "::error::$WORKING_DIRECTORY/bun.lock not found — refusing to build a cache key from a missing lockfile" >&2
+            exit 1
+          fi
         fi
 
     - name: Cache Bun install store
       id: bun-cache
-      if: inputs.skip-install != 'true'
+      if: steps.lockfile.outputs.present == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.bun/install/cache
@@ -158,7 +177,7 @@ runs:
       id: playwright-version
       if: inputs.install-playwright == 'true'
       shell: bash
-      working-directory: ${{ inputs.working-directory }}
+      working-directory: ${{ inputs.playwright-directory != '' && inputs.playwright-directory || inputs.working-directory }}
       run: |
         if [ -f package.json ]; then
           version=$(bun --print "const p=require('./package.json'); (p.devDependencies&&p.devDependencies['@playwright/test'])||(p.dependencies&&p.dependencies['@playwright/test'])||(p.devDependencies&&p.devDependencies.playwright)||(p.dependencies&&p.dependencies.playwright)||'unpinned'" 2>/dev/null || echo unpinned)
@@ -178,6 +197,7 @@ runs:
     - name: Install Playwright
       if: inputs.install-playwright == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
       shell: bash
+      working-directory: ${{ inputs.playwright-directory != '' && inputs.playwright-directory || inputs.working-directory }}
       env:
         PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
       run: |
@@ -194,6 +214,7 @@ runs:
     - name: Install Playwright system deps (browsers cached)
       if: inputs.install-playwright == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
       shell: bash
+      working-directory: ${{ inputs.playwright-directory != '' && inputs.playwright-directory || inputs.working-directory }}
       env:
         PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
       run: |

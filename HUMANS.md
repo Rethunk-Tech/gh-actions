@@ -26,6 +26,8 @@ Generic Bun toolchain + install + cache. No framework assumptions.
     # node-version: "22"               # opt-in Node runtime alongside Bun
     # install-playwright: "true"
     # playwright-browsers: chromium    # scope the Playwright install; empty = install everything
+    # playwright-directory: apps/web  # where the Playwright version is pinned and browsers
+    #                                 # install; defaults to working-directory
 ```
 
 Output: `cache-hit` — whether the Bun install-store cache was hit.
@@ -50,7 +52,9 @@ setup steps that have to happen first (e.g. cloning sibling repos for Bun `link:
 ```yaml
 - uses: Rethunk-Tech/gh-actions/setup-bun@v1.5
   with:
-    skip-install: "true"     # only installs the bun binary; no lockfile check, cache, or install
+    skip-install: "true"     # only installs the bun binary; no lockfile check, no bun install.
+                             # The install-store cache still runs whenever a bun.lock is
+                             # present, so a caller that installs later keeps the cache.
 ```
 
 ### `setup-nextjs-bun`
@@ -64,7 +68,8 @@ One Next.js app per call — for a repo with multiple Next apps, call this once 
   with:
     working-directory: frontend
     # same optional inputs as setup-bun: bun-version, node-version, install-playwright,
-    # playwright-browsers
+    # playwright-browsers, playwright-directory, extra-cache-paths, extra-cache-key,
+    # extra-cache-restore-key-fragment
 ```
 
 **Bun workspace / monorepo**, where `bun install` must run at the workspace root but the
