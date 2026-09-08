@@ -106,7 +106,7 @@ a final gate step, so enabling both still surfaces both findings even if one fai
 - uses: Rethunk-Tech/gh-actions/setup-go@v1
   with:
     run-lint: "true"
-    # lint-version: v2.12.2          # default: fleet-latest as of this writing
+    # lint-version: v2.13.2          # default: built with go1.27, matching the fleet's modules
     # lint-args: --timeout 5m
     run-govulncheck: "true"
     # govulncheck-version: v1.7.0    # default: fleet-latest as of this writing

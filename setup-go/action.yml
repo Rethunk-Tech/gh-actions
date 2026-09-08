@@ -35,9 +35,14 @@ inputs:
     required: false
     default: "false"
   lint-version:
-    description: golangci-lint version to install. Fleet-latest as of this writing.
+    description: >
+      golangci-lint version to install. Must be a release built with a Go at least as new as
+      the module's own go directive — golangci-lint refuses to load a config otherwise
+      ("the Go language version used to build golangci-lint is lower than the targeted Go
+      version"), which fails the lint gate for a reason that has nothing to do with the code.
+      v2.13.2 is built with go1.27.0; the 30 Go modules in the fleet declare go 1.27.
     required: false
-    default: v2.12.2
+    default: v2.13.2
   lint-args:
     description: Extra args for golangci-lint (e.g. --timeout 5m, --build-tags=foo).
     required: false
