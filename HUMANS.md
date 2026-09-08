@@ -89,7 +89,7 @@ also runs golangci-lint and/or govulncheck as a gate on the same job — opt-in,
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.5
+- uses: Rethunk-Tech/gh-actions/setup-go@v1
   with:
     go-version-file: go.mod          # default; may point into a subdir, e.g. backend/go.mod
     # go-version: "1.26.5"           # exact version instead — overrides go-version-file
@@ -103,12 +103,11 @@ already names (no separate `working-directory` input needed), each `continue-on-
 a final gate step, so enabling both still surfaces both findings even if one fails:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.5
+- uses: Rethunk-Tech/gh-actions/setup-go@v1
   with:
     run-lint: "true"
     # lint-version: v2.12.2          # default: fleet-latest as of this writing
     # lint-args: --timeout 5m
-    # lint-install-only: "true"      # only install the binary; a caller's own Makefile lints
     run-govulncheck: "true"
     # govulncheck-version: v1.7.0    # default: fleet-latest as of this writing
     # govulncheck-args: -tags=foo

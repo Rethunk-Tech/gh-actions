@@ -42,13 +42,6 @@ inputs:
     description: Extra args for golangci-lint (e.g. --timeout 5m, --build-tags=foo).
     required: false
     default: ""
-  lint-install-only:
-    description: >
-      Passthrough to golangci-lint-action's install-only — when true, only installs the
-      golangci-lint binary onto PATH without running it (for a caller whose own Makefile or
-      script invokes it, so lint flags stay single-sourced there).
-    required: false
-    default: "false"
   run-govulncheck:
     description: >
       When true, runs govulncheck (via `go run`, no binary left installed) after the toolchain
@@ -136,7 +129,6 @@ runs:
         version: ${{ inputs.lint-version }}
         args: ${{ inputs.lint-args }}
         working-directory: ${{ steps.moddir.outputs.dir }}
-        install-only: ${{ inputs.lint-install-only }}
 
     - name: govulncheck
       id: govulncheck
