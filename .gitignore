@@ -11,3 +11,6 @@
 
 # Local agent/editor settings. Nothing here is shared.
 .claude/
+
+# Audit-sweep findings buffer, never committed.
+FINDINGS.jsonl
