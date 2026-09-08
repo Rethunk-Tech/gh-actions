@@ -1,9 +1,9 @@
 {
-  "name": "gh-actions-test-fixture",
-  "version": "0.0.0",
-  "private": true,
-  "packageManager": "bun@1.4.0",
-  "dependencies": {
-    "is-odd": "3.0.1"
-  }
+	"name": "gh-actions-test-fixture",
+	"version": "0.0.0",
+	"private": true,
+	"packageManager": "bun@1.4.0",
+	"dependencies": {
+		"is-odd": "3.0.1"
+	}
 }
