@@ -45,6 +45,29 @@ inputs:
     description: When set, installs this Node.js version via actions/setup-node before Bun setup.
     required: false
     default: ""
+  extra-cache-paths:
+    description: >
+      Additional paths to cache beyond Bun's install store, in actions/cache `path` form
+      (newline-separated for more than one). Caching is skipped unless extra-cache-key is
+      also set. For build caches a repo owns but does not want to key on its lockfile —
+      a Turborepo .turbo directory, say.
+    required: false
+    default: ""
+  extra-cache-key:
+    description: >
+      Fragment appended to the extra-paths cache key, after `<os>-bun-extra-`. Make it
+      change whenever the cached content should be rebuilt — a commit SHA for a build
+      cache that should always save fresh, a hashFiles() for one keyed on its inputs.
+    required: false
+    default: ""
+  extra-cache-restore-key-fragment:
+    description: >
+      Fragment appended to the extra-paths restore-keys prefix, after `<os>-bun-extra-`.
+      Empty means restore from any previous extra cache for this OS, which is what a
+      SHA-keyed build cache wants — the key never repeats, so the prefix is the only
+      thing that can match.
+    required: false
+    default: ""
 
 outputs:
   cache-hit:
@@ -104,6 +127,15 @@ runs:
         key: ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-${{ hashFiles(format('{0}/**/*.js', env.NEXT_APP_DIR), format('{0}/**/*.jsx', env.NEXT_APP_DIR), format('{0}/**/*.ts', env.NEXT_APP_DIR), format('{0}/**/*.tsx', env.NEXT_APP_DIR)) }}
         restore-keys: |
           ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-
+
+    - name: Cache extra paths
+      if: inputs.extra-cache-paths != '' && inputs.extra-cache-key != ''
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ inputs.extra-cache-paths }}
+        key: ${{ runner.os }}-bun-extra-${{ inputs.extra-cache-key }}
+        restore-keys: |
+          ${{ runner.os }}-bun-extra-${{ inputs.extra-cache-restore-key-fragment }}
 
     - name: bun install
       shell: bash
