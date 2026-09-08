@@ -161,7 +161,7 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       run: |
         if [ -f package.json ]; then
-          version=$(node -p "const p=require('./package.json'); (p.devDependencies&&p.devDependencies['@playwright/test'])||(p.dependencies&&p.dependencies['@playwright/test'])||(p.devDependencies&&p.devDependencies.playwright)||(p.dependencies&&p.dependencies.playwright)||'unpinned'" 2>/dev/null || echo unpinned)
+          version=$(bun --print "const p=require('./package.json'); (p.devDependencies&&p.devDependencies['@playwright/test'])||(p.dependencies&&p.dependencies['@playwright/test'])||(p.devDependencies&&p.devDependencies.playwright)||(p.dependencies&&p.dependencies.playwright)||'unpinned'" 2>/dev/null || echo unpinned)
         else
           version=unpinned
         fi
