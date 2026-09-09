@@ -12,7 +12,7 @@
 
 Shared composite GitHub Actions for the fleet — public, not Marketplace-listed, referenced
 directly from any repo in any org via `uses: Rethunk-Tech/gh-actions/<action>@<ref>`. Built to
-replace copy-pasted Bun/Next.js/Go toolchain-setup and dependency-caching boilerplate that was
+replace copy-pasted Bun/Next.js/Go/Python toolchain-setup and dependency-caching boilerplate that was
 drifting independently per repo across the fleet.
 
 ## Quick start
@@ -38,6 +38,9 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   keep in sync with upstream's.
 - `setup-go` also bundles opt-in golangci-lint/govulncheck gates, each `continue-on-error`
   behind a final gate step — enabling both still surfaces both findings even if one fails.
+- `setup-python` wraps `astral-sh/setup-uv` with the cache forced on (upstream's `auto` default
+  silently disables it on exactly the release and tag-push events where a cold install costs
+  most), plus the same opt-in gate shape for ruff and `uv audit`.
 - `install-playwright` (`setup-bun`/`setup-nextjs-bun`) caches browsers by the resolved
   `@playwright/test` version, matching Playwright's own documented CI caching guide.
 - `extra-cache-paths` (`setup-bun`) caches a build directory the repo owns alongside the

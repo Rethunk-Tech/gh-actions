@@ -1,0 +1,14 @@
+[project]
+name = "python-app-fixture"
+version = "0.0.0"
+description = "Clean fixture for setup-python's self-test: syncs, lints, format-checks and audits green."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["ruff>=0.15.0"]
+
+# A fixture is never installed as a package — this keeps `uv sync` to just the dependency
+# groups, with no build backend to configure or keep working.
+[tool.uv]
+package = false

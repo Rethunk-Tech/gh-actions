@@ -4,10 +4,15 @@
 
 # Fixture-generated deps, not part of the fixture itself.
 .github/test-fixtures/**/node_modules/
+.github/test-fixtures/**/.venv/
 
-# Compiled binaries left behind by local `go build`/`go test` runs against a Go fixture.
-.github/test-fixtures/**/*-test-fixture*
-.github/test-fixtures/**/*-broken
+# Compiled binaries left behind by local `go build`/`go test` runs against a Go fixture. Scoped
+# one level INSIDE a fixture directory (`*/`, not `**/`): `**/*-broken` also matches the
+# `*-broken` fixture directories themselves, which silently excludes a whole fixture from both
+# `git add` and act's container copy — a self-test then passes because the action failed to find
+# its fixture at all, rather than because the gate it is testing fired.
+.github/test-fixtures/*/*-test-fixture*
+.github/test-fixtures/*/*-broken
 
 # Local agent/editor settings. Nothing here is shared.
 .claude/

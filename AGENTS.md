@@ -12,14 +12,14 @@ here, read [HUMANS.md](HUMANS.md).
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Process — commit style, testing, how to add a new action |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting and trust boundary |
 
-No `CHANGELOG.md`, `docs/`, or `specs/` yet — two actions, small enough that git tags carry the
+No `CHANGELOG.md`, `docs/`, or `specs/` yet — four actions, small enough that git tags carry the
 version history. Add a changelog once tracking that by tag alone stops scaling.
 
 ## What this repo is
 
 Composite GitHub Actions shared across the fleet (multiple orgs: Rethunk-Tech, Rethunk-AI,
 Albino-Geek-Services, Citadel-Inc, and others), built to remove copy-pasted CI boilerplate —
-Bun/Go/.NET toolchain setup, dependency caching — that was drifting independently per repo.
+Bun/Go/Python toolchain setup, dependency caching — that was drifting independently per repo.
 Public, not Marketplace-listed: Marketplace adds a global-uniqueness naming requirement, a
 root-only/no-workflows repo constraint, and public-discoverability overhead for zero
 functional gain over a plain public repo, which is all `uses: owner/repo/path@ref`
@@ -36,7 +36,7 @@ defaulting to preserving variance.
 
 ## Status
 
-**Shipped (`v1`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`.
+**Shipped (`v1`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`.
 
 **Designed, not yet built (`v2`):** `upload-pages`. Deferred, not wrong — a near-pure
 passthrough saving a couple of lines, and it currently has exactly one caller
@@ -45,8 +45,21 @@ caller. Pick it up by giving it its own directory following the conventions belo
 the design against the fleet's current state before building rather than trusting old design
 notes as binding.
 
-`setup-dotnet` was designed and dropped: no repository in any org has a `.csproj`/`.sln` with
-CI at all, so it fails this repo's own bar of a real caller evidenced by grepping usage.
+### Re-measured and still not worth building
+
+Each of these was checked against every workflow file in the fleet, not against an older design
+note. Re-measure before proposing any of them again; the counts, not the idea, are what decide.
+
+| Candidate | Bar | Measured | Verdict |
+| --- | --- | --- | --- |
+| `upload-pages` | 2+ caller repos | 1 (`Rethunk-AI/bakeoff-results`) | Unchanged since it was deferred — still wait |
+| `setup-rust` | 2+ caller repos | 1 (`Rethunk-Tech/heft`, 4 setup sites in it) | Uniform, but one repo converges with nothing |
+| `setup-dotnet` | any caller with CI | 0 — the fleet's only `.csproj`/`.sln` (`LethalModding/Radar_Ident_QuickSwitch`) has no `.github/` at all | Dropped |
+
+`setup-python`, by contrast, cleared the bar outright when it was built: 15 hand-rolled setup
+sites across 10 workflows in 6 repos, already split across four incompatible variants
+(`enable-cache` present vs absent, uv version pinned vs floating, and Python selected three
+different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `uv python install`).
 
 ## Conventions every action here follows
 
@@ -54,12 +67,14 @@ CI at all, so it fails this repo's own bar of a real caller evidenced by greppin
   composite-action convention.
 - **No build/test steps** — those are project-defined commands that vary too much per repo to
   centralize; stays the caller's own job step. **Lint/security-gate steps are the one
-  deliberate exception** (`setup-go`'s opt-in `run-lint`/`run-govulncheck`, off by default):
-  unlike build/test, every real fleet caller invokes the exact same two tools
-  (`golangci-lint-action`, `govulncheck`) with only their version/args varying — real
-  passthrough inputs, not a project-defined verb — and centralizing them converges the fleet
-  onto one reviewed SHA pin instead of the 17 independently-drifting ones the fleet
-  carried before it — now zero, verified by grepping every caller. Each such gate runs
+  deliberate exception** (`setup-go`'s opt-in `run-lint`/`run-govulncheck` and `setup-python`'s
+  `run-ruff`/`run-ruff-format`/`run-audit`, all off by default):
+  unlike build/test, every real fleet caller invokes the exact same tools for its language
+  (`golangci-lint-action` and `govulncheck` for Go; `ruff` and `uv audit` for Python) with only
+  their version/args varying — real passthrough inputs, not a project-defined verb — and
+  centralizing them converges the fleet onto one reviewed SHA pin instead of the 17
+  independently-drifting ones the fleet carried before it — now zero, verified by grepping
+  every caller. Each such gate runs
   with `continue-on-error: true` behind a final gate step (never plain fail-fast) so enabling
   more than one still surfaces every finding in one run. A caller whose exact invocation
   doesn't fit (custom JSON-gating, non-cancelling separate jobs by design) just doesn't set the
@@ -103,7 +118,10 @@ passes clean.
 The only thing that catches a broken expression, a bad cache key, or a caching mechanism that
 silently never saves is actually running the action — locally with [`act`](https://github.com/nektos/act)
 before committing, and in CI via `.github/workflows/ci.yml`'s self-test jobs (`test-setup-bun-cold`
-→ `test-setup-bun-warm`, same pattern for `setup-nextjs-bun`) after. A few things that are easy
+→ `test-setup-bun-warm`, same pattern for `setup-nextjs-bun`, `setup-go` and `setup-python`)
+after. Each gate-bearing action also gets a deliberately-broken fixture proving the gate fires
+rather than silently no-op'ing — `go-app-broken` (an errcheck violation) and `python-app-broken`
+(an F401 unused import); both compile/import clean, so only the gate can catch them. A few things that are easy
 to get wrong when writing that kind of test:
 
 - **`actions/cache` saves in the job's *post* phase, after every main step completes.**

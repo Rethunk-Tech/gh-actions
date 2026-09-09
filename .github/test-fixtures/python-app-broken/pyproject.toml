@@ -1,0 +1,14 @@
+[project]
+name = "python-app-broken-fixture"
+version = "0.0.0"
+description = "Fixture with a real ruff violation, proving setup-python's lint gate fires rather than silently no-op'ing."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["ruff>=0.15.0"]
+
+# A fixture is never installed as a package — this keeps `uv sync` to just the dependency
+# groups, with no build backend to configure or keep working.
+[tool.uv]
+package = false

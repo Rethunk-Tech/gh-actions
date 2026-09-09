@@ -1,0 +1,218 @@
+name: Setup Python (uv)
+description: >
+  Install uv and a Python interpreter via astral-sh/setup-uv, with its dependency cache
+  enabled, then run `uv sync`. Optionally also run ruff and/or `uv audit` as a gate on the same
+  job — opt-in, off by default. Writes a pass/fail table to the job's step summary.
+
+inputs:
+  python-version:
+    description: >
+      Python version to install (e.g. "3.14"). Leave empty to let uv resolve it from the
+      project's own .python-version / pyproject.toml requires-python, which is what a
+      single-version repo wants; set it for a matrix.
+    required: false
+    default: ""
+  uv-version:
+    description: >
+      uv version to install. Empty resolves from the project's pyproject.toml/uv.toml, falling
+      back to latest — setup-uv's own default. Pin it when the repo asserts a matching uv
+      elsewhere (paper-trail's check-uv-pin.sh compares its setup toolchain against CI).
+    required: false
+    default: ""
+  working-directory:
+    description: Directory containing pyproject.toml / uv.lock.
+    required: false
+    default: "."
+  install-args:
+    description: >
+      Args for `uv sync`. `--locked` fails on a stale uv.lock rather than silently re-resolving
+      it, which is the only safe default for CI. Setting this REPLACES the default rather than
+      appending, so keep --locked in the value: run-ruff below needs ruff present in the synced
+      environment, which for most of the fleet means "--locked --group dev".
+    required: false
+    default: "--locked"
+  skip-install:
+    description: >
+      When true, only installs uv and the interpreter onto PATH — skips `uv sync`. The cache is
+      still restored and saved. For callers with no project of their own (uv as a PATH tool for
+      `uvx <tool>`, which is what this repo's own lint job does) or that must sync themselves
+      later, after other setup steps.
+    required: false
+    default: "false"
+  run-ruff:
+    description: >
+      When true, runs `ruff check` after the sync. Turns this action into a job gate for callers
+      who opt in — off by default. Requires ruff in the synced environment (see install-args).
+    required: false
+    default: "false"
+  run-ruff-format:
+    description: >
+      When true, runs `ruff format --check`. Separate from run-ruff because most fleet callers
+      lint without enforcing ruff's formatter, and enabling both from one input would fail every
+      repo that has only ever run `ruff check`.
+    required: false
+    default: "false"
+  ruff-paths:
+    description: >
+      Paths ruff checks and format-checks, relative to working-directory. Shared by both ruff
+      steps — no caller lints and format-checks different trees.
+    required: false
+    default: "."
+  ruff-args:
+    description: Extra args for `ruff check` only (e.g. --select, --exclude).
+    required: false
+    default: ""
+  run-audit:
+    description: >
+      When true, runs `uv audit` after the sync. Turns this action into a job gate for callers
+      who opt in — off by default.
+    required: false
+    default: "false"
+  audit-args:
+    description: >
+      Args for `uv audit`. `--locked` audits uv.lock rather than the installed environment, so a
+      pinned-but-uninstalled extra carrying an advisory still fails.
+    required: false
+    default: "--locked"
+
+outputs:
+  uv-version:
+    description: The uv version that was installed.
+    value: ${{ steps.setup-uv.outputs.uv-version }}
+  python-version:
+    description: The Python version that was set.
+    value: ${{ steps.setup-uv.outputs.python-version }}
+  cache-hit:
+    description: Whether the uv dependency cache was hit.
+    value: ${{ steps.setup-uv.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup uv
+      id: setup-uv
+      uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+      with:
+        version: ${{ inputs.uv-version }}
+        python-version: ${{ inputs.python-version }}
+        working-directory: ${{ inputs.working-directory }}
+        # setup-uv's own default is 'auto', which silently DISABLES the cache on release, tag
+        # push, pull_request_target and workflow_run events — exactly the events where a
+        # release job's cold install costs the most. Every fleet caller already overrode it to
+        # true, including on release workflows, so that intent is the default here.
+        enable-cache: true
+        # The skip-install/PATH-tool caller has no uv.lock or pyproject to hash. Without this,
+        # the post-step save fails the job over a cache that was never going to be useful.
+        ignore-nothing-to-cache: true
+
+    - name: uv sync
+      if: inputs.skip-install != 'true'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        INSTALL_ARGS: ${{ inputs.install-args }}
+      run: |
+        if [ -n "$INSTALL_ARGS" ]; then
+          # INSTALL_ARGS may hold multiple space-separated flags; word-splitting is intentional.
+          # shellcheck disable=SC2086
+          uv sync $INSTALL_ARGS
+        else
+          uv sync
+        fi
+
+    # All three gates below run with continue-on-error: true and report through the final gate
+    # step rather than failing fast, so a caller with more than one enabled sees every finding in
+    # one run instead of losing the later tools' results to the first one's failure. A masked
+    # continue-on-error failure still shows its own warning icon in the Actions UI, so each
+    # tool's result stays individually visible.
+    - name: ruff check
+      id: ruff
+      if: inputs.run-ruff == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RUFF_ARGS: ${{ inputs.ruff-args }}
+        RUFF_PATHS: ${{ inputs.ruff-paths }}
+      run: |
+        # Both may hold multiple space-separated tokens; word-splitting is intentional.
+        # shellcheck disable=SC2086
+        uv run ruff check $RUFF_ARGS $RUFF_PATHS
+
+    - name: ruff format --check
+      id: ruff-format
+      if: inputs.run-ruff-format == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        RUFF_PATHS: ${{ inputs.ruff-paths }}
+      run: |
+        # RUFF_PATHS may hold multiple space-separated paths; word-splitting is intentional.
+        # shellcheck disable=SC2086
+        uv run ruff format --check $RUFF_PATHS
+
+    - name: uv audit
+      id: audit
+      if: inputs.run-audit == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        AUDIT_ARGS: ${{ inputs.audit-args }}
+      run: |
+        if [ -n "$AUDIT_ARGS" ]; then
+          # AUDIT_ARGS may hold multiple space-separated flags; word-splitting is intentional.
+          # shellcheck disable=SC2086
+          uv audit $AUDIT_ARGS
+        else
+          uv audit
+        fi
+
+    # Same plain pass/fail table setup-go writes, and deliberately as dumb: severity tiering or
+    # JSON parsing of an audit report is per-caller business logic this generic fleet action has
+    # no business opinionating about. A caller that wants that keeps its own downstream step.
+    - name: Gate on ruff/audit results
+      if: inputs.run-ruff == 'true' || inputs.run-ruff-format == 'true' || inputs.run-audit == 'true'
+      shell: bash
+      env:
+        RUN_RUFF: ${{ inputs.run-ruff }}
+        RUN_RUFF_FORMAT: ${{ inputs.run-ruff-format }}
+        RUN_AUDIT: ${{ inputs.run-audit }}
+        RUFF_OUTCOME: ${{ steps.ruff.outcome }}
+        RUFF_FORMAT_OUTCOME: ${{ steps.ruff-format.outcome }}
+        AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+      run: |
+        row() {
+          local enabled="$1" outcome="$2" label="$3"
+          if [ "$enabled" != 'true' ]; then
+            echo "| $label | — not run |" >> "$GITHUB_STEP_SUMMARY"
+          elif [ "$outcome" = "failure" ]; then
+            echo "| $label | ❌ fail |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| $label | ✅ pass |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+        }
+        {
+          echo "## setup-python lint/audit gate"
+          echo "| Check | Result |"
+          echo "| --- | --- |"
+        } >> "$GITHUB_STEP_SUMMARY"
+        row "$RUN_RUFF" "$RUFF_OUTCOME" "ruff check"
+        row "$RUN_RUFF_FORMAT" "$RUFF_FORMAT_OUTCOME" "ruff format --check"
+        row "$RUN_AUDIT" "$AUDIT_OUTCOME" "uv audit"
+
+        failed=0
+        if [ "$RUFF_OUTCOME" = "failure" ]; then
+          echo "::error::ruff check found issues — see the ruff check step above" >&2
+          failed=1
+        fi
+        if [ "$RUFF_FORMAT_OUTCOME" = "failure" ]; then
+          echo "::error::ruff format --check found unformatted files — see the step above" >&2
+          failed=1
+        fi
+        if [ "$AUDIT_OUTCOME" = "failure" ]; then
+          echo "::error::uv audit found vulnerabilities — see the uv audit step above" >&2
+          failed=1
+        fi
+        exit "$failed"

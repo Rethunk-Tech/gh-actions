@@ -27,6 +27,7 @@ jobs:
           uvx check-jsonschema --builtin-schema vendor.github-actions setup-bun/action.yml
           uvx check-jsonschema --builtin-schema vendor.github-actions setup-nextjs-bun/action.yml
           uvx check-jsonschema --builtin-schema vendor.github-actions setup-go/action.yml
+          uvx check-jsonschema --builtin-schema vendor.github-actions setup-python/action.yml
 
       # Neither check above can see this: an `inputs.foo` that was never declared resolves to
       # the empty string rather than erroring, so a step gated on one silently never runs.
@@ -45,6 +46,22 @@ jobs:
                   bad = True
           sys.exit(1 if bad else 0)
           EOF
+
+      # A fixture directory silently excluded by .gitignore never reaches CI's checkout, so the
+      # self-test that uses it fails at "action can't find its fixture" while its outcome
+      # assertion still reads as the gate firing. That shipped once: `**/*-broken` matched the
+      # *-broken fixture directories themselves, not just the compiled binaries it was written
+      # for, and only an act run surfaced it. Untracked fixture, tracked failure.
+      - name: Check every test fixture is actually tracked
+        run: |
+          bad=0
+          for d in .github/test-fixtures/*/; do
+            if [ -z "$(git ls-files "$d")" ]; then
+              echo "::error file=.gitignore::fixture '$d' has no tracked files — it is gitignored, so CI will never see it" >&2
+              bad=1
+            fi
+          done
+          exit "$bad"
 
       - name: Install actionlint
         run: |
@@ -74,7 +91,7 @@ jobs:
         run: |
           # --ref cannot be combined with a numeric cache ID (only with a key string). IDs are
           # already unambiguous, so no --ref is needed on the delete call itself.
-          for prefix in Linux-bun- Linux-nextjs- setup-go-Linux- playwright-Linux- Linux-bun-extra-; do
+          for prefix in Linux-bun- Linux-nextjs- setup-go-Linux- playwright-Linux- Linux-bun-extra- setup-uv-; do
             for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id'); do
               gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
             done
@@ -382,3 +399,101 @@ jobs:
             echo "::error::expected the lint gate to fail on a known-bad fixture, got outcome '$OUTCOME'" >&2
             exit 1
           fi
+
+  test-setup-python-cold:
+    name: setup-python self-test (cold cache)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-python
+        with:
+          working-directory: .github/test-fixtures/python-app
+          install-args: --locked --group dev
+      - name: assert deps synced and no exact cache hit
+        env:
+          CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+        working-directory: .github/test-fixtures/python-app
+        run: |
+          uv run ruff --version
+          if [ "$CACHE_HIT" = "true" ]; then
+            echo "::error::expected no exact cache-hit on cold run, got 'true'" >&2
+            exit 1
+          fi
+
+  test-setup-python-warm:
+    name: setup-python self-test (warm cache)
+    needs: test-setup-python-cold
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-python
+        with:
+          working-directory: .github/test-fixtures/python-app
+          install-args: --locked --group dev
+      - name: assert cache-hit true
+        env:
+          CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+        run: |
+          if [ "$CACHE_HIT" != "true" ]; then
+            echo "::error::expected cache-hit=true on warm run, got '$CACHE_HIT'" >&2
+            exit 1
+          fi
+
+  test-setup-python-gates-pass:
+    name: setup-python self-test (ruff + format + audit, clean fixture)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-python
+        with:
+          working-directory: .github/test-fixtures/python-app
+          install-args: --locked --group dev
+          run-ruff: "true"
+          run-ruff-format: "true"
+          run-audit: "true"
+
+  # Proves the lint gate actually fires rather than silently no-op'ing — a fixture with a real
+  # F401 (an unused `os` import), confirmed locally to import clean but fail `ruff check` — and
+  # that uv audit still runs (continue-on-error on each internal step) even though ruff already
+  # failed, so a caller with both enabled sees both findings in one run. The outer
+  # continue-on-error captures the composite step's own outcome instead of failing the job.
+  test-setup-python-ruff-catches-real-issue:
+    name: setup-python self-test (ruff gate fires, audit still runs anyway)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-python
+        with:
+          working-directory: .github/test-fixtures/python-app-broken
+          install-args: --locked --group dev
+          run-ruff: "true"
+          run-audit: "true"
+      - name: assert the ruff step actually failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::expected the ruff gate to fail on a known-bad fixture, got outcome '$OUTCOME'" >&2
+            exit 1
+          fi
+
+  # The project-less case: uv as a PATH tool for `uvx <tool>`, no uv.lock or pyproject anywhere.
+  # Must not error on the empty cache (ignore-nothing-to-cache) or try to sync — this repo's own
+  # lint job above calls exactly this shape.
+  test-setup-python-skip-install-no-project:
+    name: setup-python self-test (skip-install, no project)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-python
+        with:
+          working-directory: .github
+          skip-install: "true"
+      - run: uv --version
