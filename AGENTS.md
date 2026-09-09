@@ -13,7 +13,11 @@ here, read [HUMANS.md](HUMANS.md).
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting and trust boundary |
 
 No `CHANGELOG.md`, `docs/`, or `specs/` yet — four actions, small enough that git tags carry the
-version history. Add a changelog once tracking that by tag alone stops scaling.
+version history. Pushing a `v*` tag is the whole release process: `.github/workflows/release.yml`
+turns that tag's own annotation into the GitHub Release, so write the annotation as the release
+notes. HUMANS.md sends consumers to the releases page to find the current version, so a tag
+without a Release silently makes that instruction wrong — which is exactly what happened to
+v1.8, v1.9 and v1.10 before the workflow existed. Add a changelog once tracking that by tag alone stops scaling.
 
 ## What this repo is
 

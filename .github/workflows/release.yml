@@ -1,0 +1,52 @@
+name: Release
+
+# HUMANS.md points consumers at the releases page to find the current tag, so a tag without a
+# Release makes the documented discovery path wrong. That was missed three releases running
+# (v1.8, v1.9, v1.10 were all backfilled by hand), which is what this workflow removes.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Never cancel a publish mid-flight. Tag refs are unique so this should never fire anyway.
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # fetch-depth: 0 brings the annotated tag OBJECT, not just the commit it points at —
+      # `git tag -l --format=%(contents:...)` reads the annotation, and a shallow checkout has
+      # nothing to read.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Create the GitHub Release from the tag's own annotation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # Re-running a tag push (or a manual backfill that already happened) must not fail
+          # the job — the Release existing is the desired end state either way.
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; nothing to do."
+            exit 0
+          fi
+          subject=$(git tag -l --format='%(contents:subject)' "$TAG")
+          body=$(git tag -l --format='%(contents:body)' "$TAG")
+          # A lightweight tag has no annotation, so these fall back to the commit's own
+          # subject/body rather than publishing an empty Release.
+          [ -n "$subject" ] || subject=$(git log -1 --format='%s' "$TAG")
+          [ -n "$body" ] || body=$(git log -1 --format='%b' "$TAG")
+          gh release create "$TAG" \
+            --title "$TAG — $subject" \
+            --notes "${body:-$subject}" \
+            --verify-tag
