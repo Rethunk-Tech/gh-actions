@@ -42,6 +42,14 @@ defaulting to preserving variance.
 
 **Shipped (`v1`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`.
 
+`main` deliberately sits ahead of the newest tag (v1.10). The delta is two input *description*
+corrections and nothing else — `setup-bun`'s `skip-install` (it no longer disables the
+install-store cache) and `setup-python`'s `python-version` (it exports `UV_PYTHON`, it does not
+install an interpreter). Verified against the full diff: no change to `runs:`, `steps:`, input
+names, defaults or outputs, so every pinned call site in the fleet already runs current logic.
+Cutting a tag for prose alone was considered and declined — the next behavioural change carries
+these along, and the fleet re-pin comes free with it rather than costing a ~45-repo sweep.
+
 **Designed, not yet built (`v2`):** `upload-pages`. Deferred, not wrong — a near-pure
 passthrough saving a couple of lines, and it currently has exactly one caller
 (`Rethunk-AI/bakeoff-results`), which otherwise depends on nothing here. Revisit at a second
