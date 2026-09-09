@@ -55,6 +55,7 @@ note. Re-measure before proposing any of them again; the counts, not the idea, a
 | `upload-pages` | 2+ caller repos | 1 (`Rethunk-AI/bakeoff-results`) | Unchanged since it was deferred — still wait |
 | `setup-rust` | 2+ caller repos | 1 (`Rethunk-Tech/heft`, 4 setup sites in it) | Uniform, but one repo converges with nothing |
 | `setup-dotnet` | any caller with CI | 0 — the fleet's only `.csproj`/`.sln` (`LethalModding/Radar_Ident_QuickSwitch`) has no `.github/` at all | Dropped |
+| `setup-node` | 2+ caller repos needing more than a passthrough | 5 sites / 4 repos, but 4 are a bare `node-version: "24"` with no install or cache to share — Node as a runtime for `make verify` or syft. `setup-bun`'s own `node-version` input already covers the Bun-adjacent case | Passthrough, dropped |
 
 `setup-python`, by contrast, cleared the bar outright when it was built: 15 hand-rolled setup
 sites across 10 workflows in 6 repos, already split across four incompatible variants
@@ -135,6 +136,12 @@ to get wrong when writing that kind of test:
   restore/save; without it, cache steps are effectively no-ops in local testing.
 - Any test fixture created for local iteration stays untracked/cleaned up before committing —
   `.github/test-fixtures/` is the one committed exception, used by `ci.yml`'s own self-test.
+- **The cold/warm job pairs are duplicated on purpose, once per action.** A duplication scan
+  flags them, and `ci.yml` is now 520 lines across 22 jobs. Collapsing the four pairs into a
+  matrix was measured and rejected: the blocks differ in fixture path, in which output they
+  read (`cache-hit` vs `playwright-cache-hit`), and in what they assert afterwards, so a matrix
+  needs a per-entry escape for most of what actually varies. This file is the only thing that
+  proves any action works; being obvious when it fails outranks being short.
 - **`actions/cache`'s `cache-hit` output is tri-state, not boolean:**
 
   | Value | Meaning |
