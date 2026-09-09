@@ -81,11 +81,12 @@ inputs:
     default: ""
   skip-install:
     description: >
-      When true, only installs the Bun binary onto PATH — skips lockfile verification, the
-      install-store cache, and `bun install`. For callers with no package.json of their own
-      (bun used purely as a PATH tool) or that must run `bun install` themselves later, after
-      other setup steps (e.g. cloning sibling repos for Bun `link:` resolution) that have to
-      happen first.
+      When true, only installs the Bun binary onto PATH — skips `bun install`, and downgrades a
+      missing lockfile from an error to a skip. The install-store cache is still restored and
+      saved whenever a lockfile exists, because the callers this input is for still want it: for
+      callers with no package.json of their own (bun used purely as a PATH tool) or that must run
+      `bun install` themselves later, after other setup steps (e.g. cloning sibling repos for Bun
+      `link:` resolution) that have to happen first.
     required: false
     default: "false"
 
