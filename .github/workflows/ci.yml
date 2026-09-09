@@ -13,6 +13,7 @@ jobs:
   lint:
     name: Lint (schema + actionlint)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -82,6 +83,7 @@ jobs:
     name: Reset self-test caches (ensure genuinely cold)
     needs: lint
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       actions: write
     steps:
@@ -114,6 +116,7 @@ jobs:
     name: setup-bun self-test (cold cache)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -134,6 +137,7 @@ jobs:
     name: setup-bun self-test (warm cache)
     needs: test-setup-bun-cold
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -159,6 +163,7 @@ jobs:
     name: setup-bun self-test (extra-paths cache, cold)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./setup-bun
@@ -175,6 +180,7 @@ jobs:
     name: setup-bun self-test (extra-paths cache, warm)
     needs: test-setup-bun-extra-cache-cold
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./setup-bun
@@ -201,6 +207,7 @@ jobs:
     name: setup-bun self-test (skip-install still caches)
     needs: test-setup-bun-warm
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -226,6 +233,7 @@ jobs:
   test-setup-bun-skip-install-no-lockfile:
     name: setup-bun self-test (skip-install, no project)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./setup-bun
@@ -238,6 +246,7 @@ jobs:
     name: setup-nextjs-bun self-test (cold cache)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -258,6 +267,7 @@ jobs:
     name: setup-nextjs-bun self-test (warm cache)
     needs: test-setup-nextjs-bun-cold
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -277,6 +287,7 @@ jobs:
     name: setup-go self-test (cold cache)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -298,6 +309,7 @@ jobs:
     name: setup-go self-test (warm cache)
     needs: test-setup-go-cold
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -317,6 +329,7 @@ jobs:
     name: setup-bun self-test (Playwright cache, cold)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -342,6 +355,7 @@ jobs:
     name: setup-bun self-test (Playwright cache, warm)
     needs: test-setup-bun-playwright-cold
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -363,6 +377,7 @@ jobs:
     name: setup-go self-test (lint + govulncheck, clean fixture)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./setup-go
@@ -382,6 +397,7 @@ jobs:
     name: setup-go self-test (lint gate fires, govulncheck still runs anyway)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -404,6 +420,7 @@ jobs:
     name: setup-python self-test (cold cache)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -426,6 +443,7 @@ jobs:
     name: setup-python self-test (warm cache)
     needs: test-setup-python-cold
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -446,6 +464,7 @@ jobs:
     name: setup-python self-test (ruff + format + audit, clean fixture)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./setup-python
@@ -465,6 +484,7 @@ jobs:
     name: setup-python self-test (ruff gate fires, audit still runs anyway)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
@@ -490,6 +510,7 @@ jobs:
   test-setup-python-skip-install-no-project:
     name: setup-python self-test (skip-install, no project)
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: ./setup-python
