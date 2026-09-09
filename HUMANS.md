@@ -141,6 +141,11 @@ by default.
 
 Outputs: `uv-version`, `python-version`, `cache-hit`.
 
+`python-version` selects the interpreter by exporting `UV_PYTHON`; it does not install one
+itself. uv downloads a managed interpreter when `uv sync`/`uv run` needs it, so this is
+invisible to most callers — but a step that runs with networking disabled must still do its
+own `uv python install <ver>` first.
+
 `install-args` replaces the default rather than appending to it, so keep `--locked` in the
 value — it fails on a stale `uv.lock` instead of silently re-resolving it. The lint gate below
 needs ruff present in the synced environment, which for most repos means adding `--group dev`.

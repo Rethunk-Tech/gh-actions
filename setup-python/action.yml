@@ -7,9 +7,12 @@ description: >
 inputs:
   python-version:
     description: >
-      Python version to install (e.g. "3.14"). Leave empty to let uv resolve it from the
-      project's own .python-version / pyproject.toml requires-python, which is what a
-      single-version repo wants; set it for a matrix.
+      Python version to select (e.g. "3.14"), passed to setup-uv, which exports it as
+      UV_PYTHON. It does NOT install an interpreter on its own — uv downloads a managed one
+      when `uv sync`/`uv run` needs it. A caller whose build runs with networking disabled
+      must still install it explicitly (`uv python install <ver>`) before that point. Leave
+      empty to let uv resolve from the project's own .python-version / pyproject.toml
+      requires-python, which is what a single-version repo wants; set it for a matrix.
     required: false
     default: ""
   uv-version:
