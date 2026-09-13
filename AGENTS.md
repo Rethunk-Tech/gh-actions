@@ -65,7 +65,7 @@ note. Re-measure before proposing any of them again; the counts, not the idea, a
 | Candidate | Bar | Measured | Verdict |
 | --- | --- | --- | --- |
 | `upload-pages` | 2+ caller repos | 1 (`Rethunk-AI/bakeoff-results`) | Unchanged since it was deferred — still wait |
-| `setup-rust` | 2+ caller repos | 1 (`Rethunk-Tech/heft`, 4 setup sites in it) | Uniform, but one repo converges with nothing |
+| `setup-rust` | 2+ caller repos | 1 (`Rethunk-Tech/heft`, 6 setup sites in it) | Uniform, but one repo converges with nothing |
 | `setup-dotnet` | any caller with CI | 0 — the fleet's only `.csproj`/`.sln` (`LethalModding/Radar_Ident_QuickSwitch`) has no `.github/` at all | Dropped |
 | `setup-node` | 2+ caller repos needing more than a passthrough | 5 sites / 4 repos, but 4 are a bare `node-version: "24"` with no install or cache to share — Node as a runtime for `make verify` or syft. `setup-bun`'s own `node-version` input already covers the Bun-adjacent case | Passthrough, dropped |
 
