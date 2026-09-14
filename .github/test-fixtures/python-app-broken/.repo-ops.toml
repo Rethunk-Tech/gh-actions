@@ -1,0 +1,4 @@
+# This fixture fails its ruff gate on purpose (setup-python's self-test proves the gate fires), so
+# a repo-ops sweep must not report that as a verify failure.
+[verify]
+skip = true

@@ -1,0 +1,4 @@
+# This fixture fails its lint gate on purpose (setup-go's self-test proves the gate fires), so a
+# repo-ops sweep must not report that as a verify failure.
+[verify]
+skip = true

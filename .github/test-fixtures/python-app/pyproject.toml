@@ -12,3 +12,9 @@ dev = ["ruff>=0.15.0"]
 # groups, with no build backend to configure or keep working.
 [tool.uv]
 package = false
+
+# Pyrefly's default project-excludes drop every path under a dot-directory (`**/.[!/.]*/**`), and
+# this fixture lives under `.github/`, so without this it matches no files and exits 1.
+[tool.pyrefly]
+project-includes = ["src"]
+disable-project-excludes-heuristics = true
