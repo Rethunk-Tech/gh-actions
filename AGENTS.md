@@ -83,7 +83,7 @@ different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `u
   deliberate exception** (`setup-go`'s opt-in `run-lint`/`run-govulncheck` and `setup-python`'s
   `run-ruff`/`run-ruff-format`/`run-audit`, all off by default):
   unlike build/test, every real fleet caller invokes the exact same tools for its language
-  (`golangci-lint-action` and `govulncheck` for Go; `ruff` and `uv audit` for Python) with only
+  (`golangci-lint` and `govulncheck` for Go; `ruff` and `uv audit` for Python) with only
   their version/args varying — real passthrough inputs, not a project-defined verb — and
   centralizing them converges the fleet onto one reviewed SHA pin instead of the 17
   independently-drifting ones the fleet carried before it — now zero, verified by grepping
@@ -93,6 +93,13 @@ different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `u
   doesn't fit (custom JSON-gating, non-cancelling separate jobs by design) just doesn't set the
   input and keeps its own step — this exception doesn't extend to a project's actual
   build/test commands, which stay out per the rule above.
+- **A new step inside an action may only `uses:` a GitHub-owned action (`actions/*`).** The
+  existing `oven-sh/setup-bun` and `astral-sh/setup-uv` pass as verified-Marketplace actions;
+  nothing else does. GitHub checks actions nested inside a
+  composite against each consuming org's allowlist, and Rethunk-AI allows only GitHub-owned,
+  verified-Marketplace, and `Rethunk-Tech/gh-actions/*` actions. A nested
+  `golangci/golangci-lint-action` failed every Rethunk-AI job that called `setup-go`, which is
+  why `setup-go` downloads golangci-lint itself.
 - **Every wrapped action is SHA-pinned** with a `# vX.Y.Z` comment. The repo-ops
   actions-refresh-sha sweep keeps these current within a major; a wrapped action's major bump
   is a manual, reviewed change here.
@@ -148,7 +155,10 @@ to get wrong when writing that kind of test:
   restore/save; without it, cache steps are effectively no-ops in local testing.
 - Any test fixture created for local iteration stays untracked/cleaned up before committing —
   `.github/test-fixtures/` is the one committed exception, used by `ci.yml`'s own self-test.
-- **The cold/warm job pairs are duplicated on purpose, once per action.** A duplication scan
+- **`setup-go`'s cold/warm pair is one job with a two-leg `max-parallel: 1` matrix**, not two
+  jobs: its cache key contains `github.job`, so two differently-named jobs never share an
+  exact key.
+- **The other cold/warm job pairs are duplicated on purpose, once per action.** A duplication scan
   flags them, and `ci.yml` is now 520 lines across 22 jobs. Collapsing the four pairs into a
   matrix was measured and rejected: the blocks differ in fixture path, in which output they
   read (`cache-hit` vs `playwright-cache-hit`), and in what they assert afterwards, so a matrix

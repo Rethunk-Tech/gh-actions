@@ -1,6 +1,6 @@
 name: Setup Go
 description: >
-  Install a Go toolchain via actions/setup-go, with its built-in module/build cache enabled.
+  Install a Go toolchain via actions/setup-go and cache its module and build caches per job.
   Optionally also run golangci-lint and/or govulncheck as a gate on the same job — opt-in, off
   by default. Writes a pass/fail table to the job's step summary.
 
@@ -22,29 +22,28 @@ inputs:
     default: go.mod
   cache-dependency-path:
     description: >
-      Glob(s) used to build the module cache key, passed to actions/setup-go. Leave empty to
-      default to go-version-file itself — NOT actions/setup-go's own built-in default, which
-      only ever checks for a bare go.mod at the checkout root and silently fails to cache for
-      any module in a subdirectory (verified against real CI logs, not just its docs).
+      Glob(s) hashed into the module/build cache key (newline-separated for more than one).
+      Leave empty to default to the go.sum next to go-version-file plus go-version-file itself.
     required: false
     default: ""
   run-lint:
     description: >
-      When true, runs golangci-lint via golangci-lint-action after the toolchain is set up.
-      Turns this action into a job gate for callers who opt in — off by default.
+      When true, downloads golangci-lint (checksum-verified against its release) and runs it
+      after the toolchain is set up. Turns this action into a job gate for callers who opt in —
+      off by default. Linux and macOS runners only.
     required: false
     default: "false"
   lint-version:
     description: >
-      golangci-lint version to install. Must be a release built with a Go at least as new as
-      the module's own go directive — golangci-lint refuses to load a config otherwise
+      golangci-lint release to run (e.g. "v2.13.2"). Must be a release built with a Go at least as
+      new as the module's own go directive — golangci-lint refuses to load a config otherwise
       ("the Go language version used to build golangci-lint is lower than the targeted Go
       version"), which fails the lint gate for a reason that has nothing to do with the code.
       v2.13.2 is built with go1.27.0; the 30 Go modules in the fleet declare go 1.27.
     required: false
     default: v2.13.2
   lint-args:
-    description: Extra args for golangci-lint (e.g. --timeout 5m, --build-tags=foo).
+    description: Extra args for `golangci-lint run` (e.g. --timeout 5m, --build-tags=foo).
     required: false
     default: ""
   run-govulncheck:
@@ -67,58 +66,137 @@ outputs:
     description: The Go version that was installed.
     value: ${{ steps.setup-go.outputs.go-version }}
   cache-hit:
-    description: Whether the module/build cache was hit.
-    value: ${{ steps.setup-go.outputs.cache-hit }}
+    description: Whether the module/build cache was restored from an exact key match for this job.
+    value: ${{ steps.go-cache.outputs.cache-hit }}
 
 runs:
   using: composite
   steps:
+    # actions/setup-go's own cache is off: its key is go.mod's hash with no job component and no
+    # restore-keys, so every job of a run races for one entry (the first job to finish wins, and
+    # a lint job's cache holds no -race or test builds), and any go.mod change is a total miss.
     - name: Setup Go
       id: setup-go
       uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
       with:
         go-version: ${{ inputs.go-version }}
         go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
-        cache: true
-        # actions/setup-go's own empty-cache-dependency-path auto-discovery only ever checks
-        # for a literal go.mod at the WORKSPACE ROOT — it never looks next to go-version-file,
-        # so it silently fails ("Restore cache failed: Dependencies file is not found...") for
-        # every caller whose module lives in a subdirectory, which is most of the fleet. Falls
-        # back to go-version-file itself (not a guessed go.sum path) since that file always
-        # exists by construction, unlike a go.sum a zero-external-dependency module never had.
-        cache-dependency-path: ${{ inputs.cache-dependency-path != '' && inputs.cache-dependency-path || inputs.go-version-file }}
+        cache: false
 
     # Derives the module directory from cache-dependency-path or go-version-file rather than
     # taking a separate working-directory input — every real fleet caller's lint/govulncheck
-    # directory is exactly one of these two paths' own dirname, never something else, so a
-    # second input would only ever duplicate what this one step already computes.
-    # cache-dependency-path wins when both are set: a caller that pins an explicit go-version
-    # (global-ai-alliance) leaves go-version-file at its "go.mod" default, which would resolve
-    # to the wrong (checkout-root) directory — cache-dependency-path is the one that actually
-    # names the module's real location in that case.
-    - name: Resolve module directory
+    # directory is exactly one of these two paths' own dirname. cache-dependency-path wins when
+    # both are set: a caller that pins an explicit go-version (global-ai-alliance) leaves
+    # go-version-file at its "go.mod" default, which would resolve to the checkout root.
+    # The cache paths go through $GITHUB_ENV, not step outputs, for the same actions/runner#2009
+    # post-step reason setup-nextjs-bun resolves NEXT_CACHE_DIR that way.
+    - name: Resolve module directory and cache paths
       id: moddir
-      if: inputs.run-lint == 'true' || inputs.run-govulncheck == 'true'
       shell: bash
       env:
         GO_VERSION_FILE: ${{ inputs.go-version-file }}
         CACHE_DEPENDENCY_PATH: ${{ inputs.cache-dependency-path }}
+        NEEDS_DIR: ${{ inputs.run-lint == 'true' || inputs.run-govulncheck == 'true' }}
       run: |
         if [ -n "$CACHE_DEPENDENCY_PATH" ]; then
           path="$CACHE_DEPENDENCY_PATH"
+          deps="$CACHE_DEPENDENCY_PATH"
         else
           path="$GO_VERSION_FILE"
+          deps="$(dirname "$GO_VERSION_FILE")/go.sum"$'\n'"$GO_VERSION_FILE"
         fi
-        # A multi-line (multi-module) or glob value has no single dirname — dirname would
-        # silently truncate it or write a malformed multi-line $GITHUB_OUTPUT record. No real
-        # caller passes either today; fail loudly rather than derive a wrong directory.
+        {
+          echo "deps<<SETUP_GO_EOF"
+          echo "$deps"
+          echo "SETUP_GO_EOF"
+        } >> "$GITHUB_OUTPUT"
+        # A multi-line (multi-module) or glob value has no single dirname. Only the gates need
+        # one; fail loudly for them rather than derive a wrong directory.
         case "$path" in
           *$'\n'*|*'*'*)
-            echo "::error::run-lint/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave run-lint/run-govulncheck off for this caller." >&2
-            exit 1
+            if [ "$NEEDS_DIR" = "true" ]; then
+              echo "::error::run-lint/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave run-lint/run-govulncheck off for this caller." >&2
+              exit 1
+            fi
+            ;;
+          *)
+            echo "dir=$(dirname "$path")" >> "$GITHUB_OUTPUT"
             ;;
         esac
-        echo "dir=$(dirname "$path")" >> "$GITHUB_OUTPUT"
+        {
+          echo "SETUP_GO_BUILD_CACHE=$(go env GOCACHE)"
+          echo "SETUP_GO_MOD_CACHE=$(go env GOMODCACHE)"
+        } >> "$GITHUB_ENV"
+
+    # Saved in the post step, after the caller's own build/test commands have filled both
+    # caches. The job id sits last in the key so that each job keeps its own build profile
+    # (claude-format-hooks: lint saved first and every later -race test job restored a cache
+    # with no race builds, 34-38s warm). A job's first run, or a dependency change, falls back
+    # to the newest cache of any job for the same Go version. Growth is bounded: Go trims build
+    # entries unused for five days before the post step saves, and a Go release resets the
+    # prefix entirely.
+    - name: Cache Go modules and build cache
+      id: go-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ env.SETUP_GO_MOD_CACHE }}
+          ${{ env.SETUP_GO_BUILD_CACHE }}
+        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-${{ github.job }}
+        restore-keys: |
+          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-
+          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
+
+    # The golangci-lint binary is downloaded rather than cached: the release fetch measured
+    # 0.6s (bastion-mfa), no faster than a cache round trip. Its own analysis cache is filled
+    # inside this action, so restore and save are split and an exact hit skips the save.
+    - name: Restore golangci-lint cache
+      id: lint-cache
+      if: inputs.run-lint == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/setup-go-golangci-lint
+        key: setup-go-lint-${{ runner.os }}-${{ runner.arch }}-${{ inputs.lint-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}
+        restore-keys: |
+          setup-go-lint-${{ runner.os }}-${{ runner.arch }}-${{ inputs.lint-version }}-
+
+    # Not continue-on-error: a failed download or checksum mismatch is an infrastructure
+    # failure, and must not be reported by the gate below as lint findings.
+    - name: Install golangci-lint
+      id: lint-install
+      if: inputs.run-lint == 'true'
+      shell: bash
+      env:
+        LINT_VERSION: ${{ inputs.lint-version }}
+        OS_NAME: ${{ runner.os }}
+        ARCH_NAME: ${{ runner.arch }}
+      run: |
+        set -u
+        case "$OS_NAME" in
+          Linux) os=linux ;;
+          macOS) os=darwin ;;
+          *) echo "::error::run-lint supports Linux and macOS runners, not $OS_NAME" >&2; exit 1 ;;
+        esac
+        case "$ARCH_NAME" in
+          X64) arch=amd64 ;;
+          ARM64) arch=arm64 ;;
+          *) echo "::error::run-lint has no golangci-lint release for runner arch $ARCH_NAME" >&2; exit 1 ;;
+        esac
+        version="${LINT_VERSION#v}"
+        base="golangci-lint-$version-$os-$arch"
+        url="https://github.com/golangci/golangci-lint/releases/download/v$version"
+        dir="$RUNNER_TEMP/setup-go-golangci-lint"
+        mkdir -p "$dir"
+        cd "$dir" || exit 1
+        curl -fsSL --retry 3 -o "$base.tar.gz" "$url/$base.tar.gz"
+        curl -fsSL --retry 3 -o checksums.txt "$url/golangci-lint-$version-checksums.txt"
+        grep " $base.tar.gz\$" checksums.txt > expected.txt || {
+          echo "::error::$base.tar.gz is not listed in the v$version checksums file" >&2
+          exit 1
+        }
+        shasum -a 256 -c expected.txt
+        tar -xzf "$base.tar.gz"
+        echo "bin=$dir/$base/golangci-lint" >> "$GITHUB_OUTPUT"
 
     # Both gates below run with continue-on-error: true and report through the final gate step
     # rather than failing fast — a caller with both enabled sees BOTH findings in one run,
@@ -129,11 +207,32 @@ runs:
       id: lint
       if: inputs.run-lint == 'true'
       continue-on-error: true
-      uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
+      shell: bash
+      working-directory: ${{ steps.moddir.outputs.dir }}
+      env:
+        GOLANGCI_LINT: ${{ steps.lint-install.outputs.bin }}
+        LINT_ARGS: ${{ inputs.lint-args }}
+      run: |
+        export GOLANGCI_LINT_CACHE="$HOME/.cache/setup-go-golangci-lint"
+        # golangci-lint-action verified the config before running; keep that, since a key the
+        # schema rejects is otherwise ignored silently.
+        if "$GOLANGCI_LINT" config path >/dev/null 2>&1; then
+          "$GOLANGCI_LINT" config verify
+        fi
+        if [ -n "$LINT_ARGS" ]; then
+          # LINT_ARGS may hold multiple space-separated flags; word-splitting is intentional.
+          # shellcheck disable=SC2086
+          "$GOLANGCI_LINT" run $LINT_ARGS
+        else
+          "$GOLANGCI_LINT" run
+        fi
+
+    - name: Save golangci-lint cache
+      if: inputs.run-lint == 'true' && steps.lint-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
-        version: ${{ inputs.lint-version }}
-        args: ${{ inputs.lint-args }}
-        working-directory: ${{ steps.moddir.outputs.dir }}
+        path: ~/.cache/setup-go-golangci-lint
+        key: ${{ steps.lint-cache.outputs.cache-primary-key }}
 
     - name: govulncheck
       id: govulncheck

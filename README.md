@@ -34,8 +34,8 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   `packageManager` field by default — no version to keep in sync by hand.
 - `setup-nextjs-bun` adds a `.next/cache` build cache keyed exactly per Next.js's own
   documented CI caching guide (lockfile hash + source-file hash, independently invalidated).
-- `setup-go` wraps `actions/setup-go`'s own module/build cache — no hand-rolled cache key to
-  keep in sync with upstream's.
+- `setup-go` caches modules and the build cache per job, so a lint job never overwrites the
+  `-race` build a test job needs, with a same-Go-version fallback across jobs.
 - `setup-go` also bundles opt-in golangci-lint/govulncheck gates, each `continue-on-error`
   behind a final gate step — enabling both still surfaces both findings even if one fails.
 - `setup-python` wraps `astral-sh/setup-uv` with the cache forced on (upstream's `auto` default

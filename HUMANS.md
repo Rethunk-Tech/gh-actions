@@ -89,8 +89,8 @@ Output: `cache-hit` — whether the Bun install-store cache was hit.
 
 ### `setup-go`
 
-Go toolchain via `actions/setup-go`, with its built-in module/build cache enabled. Optionally
-also runs golangci-lint and/or govulncheck as a gate on the same job — opt-in, off by default.
+Go toolchain via `actions/setup-go`, plus a module/build cache keyed per job. Optionally also
+runs golangci-lint and/or govulncheck as a gate on the same job — opt-in, off by default.
 
 ```yaml
 - uses: actions/checkout@v7
@@ -98,10 +98,15 @@ also runs golangci-lint and/or govulncheck as a gate on the same job — opt-in,
   with:
     go-version-file: go.mod          # default; may point into a subdir, e.g. backend/go.mod
     # go-version: "1.26.5"           # exact version instead — overrides go-version-file
-    # cache-dependency-path: go.sum  # default: resolved next to go-version-file
+    # cache-dependency-path: "**/go.sum"  # default: the go.sum next to go-version-file, plus go-version-file
 ```
 
-Outputs: `go-version`, `cache-hit`.
+Outputs: `go-version`, `cache-hit` (an exact key match for this job).
+
+The cache key is Go version + dependency hash + job id, so a `lint` job and a `go test -race` job
+each restore the build cache they filled themselves. A job's first run, or a dependency bump,
+falls back to the newest cache any job saved for the same Go version. Matrix legs share one job
+id and therefore one cache entry.
 
 **Lint + vuln gate** — both run from the same directory `go-version-file`/`cache-dependency-path`
 already names (no separate `working-directory` input needed), each `continue-on-error` behind
@@ -110,7 +115,7 @@ a final gate step, so enabling both still surfaces both findings even if one fai
 ```yaml
 - uses: Rethunk-Tech/gh-actions/setup-go@v1.10
   with:
-    run-lint: "true"
+    run-lint: "true"                 # Linux and macOS runners; binary checksum-verified per run
     # lint-version: v2.13.2          # default: built with go1.27, matching the fleet's modules
     # lint-args: --timeout 5m
     run-govulncheck: "true"

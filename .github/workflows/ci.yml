@@ -87,13 +87,13 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Delete Linux-bun-*, Linux-nextjs-*, setup-go-Linux-*, playwright-Linux-* caches for this ref
+      - name: Delete every self-test cache prefix for this ref
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           # --ref cannot be combined with a numeric cache ID (only with a key string). IDs are
           # already unambiguous, so no --ref is needed on the delete call itself.
-          for prefix in Linux-bun- Linux-nextjs- setup-go-Linux- playwright-Linux- Linux-bun-extra- setup-uv-; do
+          for prefix in Linux-bun- Linux-nextjs- setup-go-Linux- setup-go-lint- playwright-Linux- Linux-bun-extra- setup-uv-; do
             for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id'); do
               gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
             done
@@ -283,44 +283,36 @@ jobs:
             exit 1
           fi
 
-  test-setup-go-cold:
-    name: setup-go self-test (cold cache)
+  # setup-go keys its cache on github.job, so a cold job and a separate warm job could never
+  # share an exact key. One job id with two matrix legs does: max-parallel 1 runs them in
+  # declared order, and the cold leg's post-step save lands before the warm leg starts.
+  test-setup-go-cache:
+    name: setup-go self-test (${{ matrix.phase }} cache)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    strategy:
+      max-parallel: 1
+      matrix:
+        phase: [cold, warm]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - id: setup
         uses: ./setup-go
         with:
           go-version-file: .github/test-fixtures/go-app/go.mod
-      - name: assert build works and no exact cache hit
+      - name: assert build works and the cache hit matches the phase
         env:
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+          PHASE: ${{ matrix.phase }}
         working-directory: .github/test-fixtures/go-app
         run: |
           go build ./...
-          if [ "$CACHE_HIT" = "true" ]; then
+          if [ "$PHASE" = "cold" ] && [ "$CACHE_HIT" = "true" ]; then
             echo "::error::expected no exact cache-hit on cold run, got 'true'" >&2
             exit 1
           fi
-
-  test-setup-go-warm:
-    name: setup-go self-test (warm cache)
-    needs: test-setup-go-cold
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - id: setup
-        uses: ./setup-go
-        with:
-          go-version-file: .github/test-fixtures/go-app/go.mod
-      - name: assert cache-hit true
-        env:
-          CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
-        run: |
-          if [ "$CACHE_HIT" != "true" ]; then
+          if [ "$PHASE" = "warm" ] && [ "$CACHE_HIT" != "true" ]; then
             echo "::error::expected cache-hit=true on warm run, got '$CACHE_HIT'" >&2
             exit 1
           fi
