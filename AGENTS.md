@@ -12,7 +12,7 @@ here, read [HUMANS.md](HUMANS.md).
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Process — commit style, testing, how to add a new action |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting and trust boundary |
 
-No `CHANGELOG.md`, `docs/`, or `specs/` yet — four actions, small enough that git tags carry the
+No `CHANGELOG.md`, `docs/`, or `specs/` yet — five actions, small enough that git tags carry the
 version history. Pushing a `v*` tag is the whole release process: `.github/workflows/release.yml`
 turns that tag's own annotation into the GitHub Release, so write the annotation as the release
 notes, and moves the floating `vN` tag to it when it is the newest `vN.M` release. HUMANS.md sends consumers to the releases page to find the current version, so a tag
@@ -40,7 +40,11 @@ defaulting to preserving variance.
 
 ## Status
 
-**Shipped (`v1`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`.
+**Shipped (`v1`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`, `setup-rust`.
+
+`setup-rust` has one caller (`Rethunk-Tech/heft`, 6 setup sites) and was built anyway. heft's
+`Swatinem/rust-cache` and `dtolnay/rust-toolchain` are not GitHub-owned, so every heft job
+depended on third-party actions no org allowlist here vouches for.
 
 `main` deliberately sits ahead of the newest tag (v1.10). The delta is two input *description*
 corrections and nothing else — `setup-bun`'s `skip-install` (it no longer disables the
@@ -65,7 +69,6 @@ note. Re-measure before proposing any of them again; the counts, not the idea, a
 | Candidate | Bar | Measured | Verdict |
 | --- | --- | --- | --- |
 | `upload-pages` | 2+ caller repos | 1 (`Rethunk-AI/bakeoff-results`) | Unchanged since it was deferred — still wait |
-| `setup-rust` | 2+ caller repos | 1 (`Rethunk-Tech/heft`, 6 setup sites in it) | Uniform, but one repo converges with nothing |
 | `setup-dotnet` | any caller with CI | 0 — the fleet's only `.csproj`/`.sln` (`LethalModding/Radar_Ident_QuickSwitch`) has no `.github/` at all | Dropped |
 | `setup-node` | 2+ caller repos needing more than a passthrough | 5 sites / 4 repos, but 4 are a bare `node-version: "24"` with no install or cache to share — Node as a runtime for `make verify` or syft. `setup-bun`'s own `node-version` input already covers the Bun-adjacent case | Passthrough, dropped |
 

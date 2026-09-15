@@ -1,0 +1,103 @@
+name: Setup Rust
+description: >
+  Install a Rust toolchain with the runner's preinstalled rustup — from rust-toolchain.toml or an
+  explicit channel — plus components and targets, and cache the cargo registry, git
+  dependencies and target/ per job.
+
+inputs:
+  toolchain:
+    description: >
+      Toolchain to install and make the rustup default (e.g. "stable", "1.98"). Leave empty to
+      install whatever working-directory's rust-toolchain.toml (or rust-toolchain) names,
+      falling back to stable when there is none. A toolchain file still outranks the rustup
+      default inside its directory, so a job checking an older toolchain against a repo that
+      pins stable runs `cargo +<toolchain> ...`.
+    required: false
+    default: ""
+  components:
+    description: Extra components, comma- or space-separated (e.g. "rustfmt, clippy").
+    required: false
+    default: ""
+  targets:
+    description: Extra targets, comma- or space-separated (e.g. "aarch64-unknown-linux-gnu").
+    required: false
+    default: ""
+  working-directory:
+    description: Directory containing Cargo.lock and any rust-toolchain.toml.
+    required: false
+    default: "."
+
+outputs:
+  cache-hit:
+    description: Whether the cargo cache was restored from an exact key match for this job.
+    value: ${{ steps.cargo-cache.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    # The fingerprint is `rustc -vV` plus the target list: target/ is useless to any other
+    # compiler build, and matrix legs that differ only by target share one github.job.
+    - name: Install Rust toolchain
+      id: toolchain
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        TOOLCHAIN: ${{ inputs.toolchain }}
+        COMPONENTS: ${{ inputs.components }}
+        TARGETS: ${{ inputs.targets }}
+      run: |
+        want_components=$(printf '%s' "$COMPONENTS" | tr ' ' ',' | tr -s ',' | sed 's/^,//;s/,$//')
+        want_targets=$(printf '%s' "$TARGETS" | tr ' ' ',' | tr -s ',' | sed 's/^,//;s/,$//')
+        # rustup's default profile also downloads rust-docs, which no CI job reads.
+        rustup set profile minimal
+        if [ -z "$TOOLCHAIN" ] && { [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; }; then
+          # With no name, rustup installs the toolchain file's channel, components and targets.
+          rustup toolchain install --no-self-update
+          rustc=(rustc)
+          extra=()
+        else
+          rustup toolchain install "${TOOLCHAIN:-stable}" --no-self-update
+          rustup default "${TOOLCHAIN:-stable}"
+          rustc=(rustc "+${TOOLCHAIN:-stable}")
+          extra=(--toolchain "${TOOLCHAIN:-stable}")
+        fi
+        if [ -n "$want_components" ]; then
+          IFS=, read -ra list <<< "$want_components"
+          rustup component add "${extra[@]}" "${list[@]}"
+        fi
+        if [ -n "$want_targets" ]; then
+          IFS=, read -ra list <<< "$want_targets"
+          rustup target add "${extra[@]}" "${list[@]}"
+        fi
+        "${rustc[@]}" -V
+        fingerprint=$(printf '%s\n%s\n' "$("${rustc[@]}" -vV)" "$want_targets" | git hash-object --stdin)
+        echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+        {
+          echo "SETUP_RUST_CARGO_HOME=${CARGO_HOME:-$HOME/.cargo}"
+          echo "SETUP_RUST_TARGET_DIR=${CARGO_TARGET_DIR:-$PWD/target}"
+          # Incremental artifacts are large and never reused by a clean CI build; caching them
+          # only slows the save. A caller that set it explicitly keeps its own value.
+          if [ -z "${CARGO_INCREMENTAL:-}" ]; then
+            echo "CARGO_INCREMENTAL=0"
+          fi
+        } >> "$GITHUB_ENV"
+
+    # Saved in the post step, after the caller's cargo commands. The job id sits last in the key
+    # so each job keeps its own profile (clippy, test and release builds do not share
+    # artifacts). A lockfile change, or a job's first run, falls back to the newest cache of any
+    # job for the same compiler and targets; a new rustc resets the prefix, which bounds how
+    # much stale dependency output target/ can accumulate. registry/src is left out because
+    # cargo re-extracts it from registry/cache.
+    - name: Cache cargo registry and target
+      id: cargo-cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: |
+          ${{ env.SETUP_RUST_CARGO_HOME }}/registry/index
+          ${{ env.SETUP_RUST_CARGO_HOME }}/registry/cache
+          ${{ env.SETUP_RUST_CARGO_HOME }}/git/db
+          ${{ env.SETUP_RUST_TARGET_DIR }}
+        key: setup-rust-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles(format('{0}/Cargo.lock', inputs.working-directory)) }}-${{ github.job }}
+        restore-keys: |
+          setup-rust-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles(format('{0}/Cargo.lock', inputs.working-directory)) }}-
+          setup-rust-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.fingerprint }}-

@@ -190,6 +190,31 @@ and `uvx` on PATH for a standalone tool:
                              # still restored and saved.
 ```
 
+### `setup-rust`
+
+A Rust toolchain from the runner's preinstalled rustup, plus a cargo registry and `target/`
+cache keyed per job.
+
+```yaml
+- uses: actions/checkout@v7
+- uses: Rethunk-Tech/gh-actions/setup-rust@v1.10
+  with:
+    # toolchain: "1.98"                  # default: rust-toolchain.toml, else stable
+    # components: rustfmt, clippy        # comma- or space-separated
+    # targets: aarch64-unknown-linux-gnu
+    # working-directory: .               # where Cargo.lock and rust-toolchain.toml live
+```
+
+Output: `cache-hit` (an exact key match for this job).
+
+The key is the compiler build (`rustc -vV`) + `targets` + `Cargo.lock` hash + job id, so matrix
+legs that differ by target, and jobs on different toolchains, never share a `target/`. Sets
+`CARGO_INCREMENTAL=0` unless the job already set it.
+
+A `toolchain` input becomes the rustup default, but a `rust-toolchain.toml` still wins inside
+its own directory. To check an older toolchain in such a repo, name it on the command:
+`cargo +1.98 check`.
+
 ### Coming later
 
 `upload-pages` is designed but not yet built — see [AGENTS.md](AGENTS.md)

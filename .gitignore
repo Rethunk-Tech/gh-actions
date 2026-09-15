@@ -5,6 +5,7 @@
 # Fixture-generated deps, not part of the fixture itself.
 .github/test-fixtures/**/node_modules/
 .github/test-fixtures/**/.venv/
+.github/test-fixtures/**/target/
 
 # Compiled binaries left behind by local `go build`/`go test` runs against a Go fixture. Scoped
 # one level INSIDE a fixture directory (`*/`, not `**/`): `**/*-broken` also matches the

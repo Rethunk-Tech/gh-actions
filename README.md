@@ -12,7 +12,7 @@
 
 Shared composite GitHub Actions for the fleet — public, not Marketplace-listed, referenced
 directly from any repo in any org via `uses: Rethunk-Tech/gh-actions/<action>@<ref>`. Built to
-replace copy-pasted Bun/Next.js/Go/Python toolchain-setup and dependency-caching boilerplate that was
+replace copy-pasted Bun/Next.js/Go/Python/Rust toolchain-setup and dependency-caching boilerplate that was
 drifting independently per repo across the fleet.
 
 ## Quick start
