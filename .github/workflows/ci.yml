@@ -104,14 +104,10 @@ jobs:
   # completed — this is what actually proves cache-hit == 'true' on the second run, since
   # actions/cache saves in a post step that a same-job second invocation would never see in
   # time). setup-bun and setup-nextjs-bun use separate fixtures with different lockfile
-  # content, so their exact cache KEYS never collide — but both intentionally share the same
-  # restore-keys PREFIX (${{ runner.os }}-bun-, for cross-project cache warmth in real
-  # consumers). Because the two cold jobs run in parallel, one fixture's post-step save can
-  # land before the other's restore runs, producing a legitimate restore-keys PARTIAL match
-  # (cache-hit: 'false') rather than a total miss (cache-hit: ''). Both are valid "not an
-  # exact hit" outcomes on a genuinely cold run, so the assertion checks != 'true', not
-  # emptiness — a real regression (a stale EXACT match surviving the reset job) still fails
-  # this.
+  # content, so their exact cache KEYS never collide. Cold assertions check != 'true' rather
+  # than emptiness, so an action that does use restore-keys (setup-go) can legitimately
+  # partial-match another fixture's parallel save — a stale EXACT match surviving the reset
+  # job still fails.
   test-setup-bun-cold:
     name: setup-bun self-test (cold cache)
     needs: reset-self-test-caches
@@ -364,6 +360,10 @@ jobs:
             echo "::error::expected Playwright cache-hit=true on warm run, got '$PW_CACHE_HIT'" >&2
             exit 1
           fi
+      # The system-deps step skips a font-only gap, so prove Chromium still launches without it.
+      - name: assert Chromium launches
+        working-directory: .github/test-fixtures/bun-app-playwright
+        run: node -e "require('@playwright/test').chromium.launch().then((b) => b.close())"
 
   test-setup-go-lint-vuln-pass:
     name: setup-go self-test (lint + govulncheck, clean fixture)

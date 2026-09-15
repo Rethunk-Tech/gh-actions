@@ -120,20 +120,29 @@ runs:
         echo "NEXT_APP_DIR=${NEXT_APP_DIR}" >> "$GITHUB_ENV"
         echo "NEXT_CACHE_DIR=${NEXT_APP_DIR}/.next/cache" >> "$GITHUB_ENV"
 
+    # No restore-keys: see the same step in setup-bun for the measured store growth.
     - name: Cache Bun install store
       id: bun-cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.bun/install/cache
         key: ${{ runner.os }}-bun-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}
-        restore-keys: |
-          ${{ runner.os }}-bun-
+
+    # The runner re-evaluates a cache step's `with:` in its post step, after bun install and the
+    # caller's build. A hashFiles() source glob in the key then walks node_modules and .next:
+    # 15s of Rethunk-Tech/Website's 16s "Post Setup Bun + Next.js" went there before tar
+    # started. Hashing once here, before either exists, leaves the post step a variable lookup.
+    - name: Hash Next.js sources
+      shell: bash
+      env:
+        NEXT_SRC_HASH: ${{ hashFiles(format('{0}/**/*.js', env.NEXT_APP_DIR), format('{0}/**/*.jsx', env.NEXT_APP_DIR), format('{0}/**/*.ts', env.NEXT_APP_DIR), format('{0}/**/*.tsx', env.NEXT_APP_DIR), format('!{0}/**/node_modules/**', env.NEXT_APP_DIR), format('!{0}/**/.next/**', env.NEXT_APP_DIR)) }}
+      run: echo "NEXT_SRC_HASH=$NEXT_SRC_HASH" >> "$GITHUB_ENV"
 
     - name: Cache Next.js build cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.NEXT_CACHE_DIR }}
-        key: ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-${{ hashFiles(format('{0}/**/*.js', env.NEXT_APP_DIR), format('{0}/**/*.jsx', env.NEXT_APP_DIR), format('{0}/**/*.ts', env.NEXT_APP_DIR), format('{0}/**/*.tsx', env.NEXT_APP_DIR)) }}
+        key: ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-${{ env.NEXT_SRC_HASH }}
         restore-keys: |
           ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-
 
@@ -179,29 +188,39 @@ runs:
       env:
         PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
       run: |
-        if [ -n "$PLAYWRIGHT_BROWSERS" ]; then
-          # PLAYWRIGHT_BROWSERS may hold multiple space-separated browser names; word-splitting is intentional.
-          # shellcheck disable=SC2086
-          bunx playwright install --with-deps $PLAYWRIGHT_BROWSERS
-        else
-          bunx playwright install --with-deps
-        fi
+        # PLAYWRIGHT_BROWSERS may hold multiple space-separated browser names; word-splitting is
+        # intentional, and an empty value leaves no arguments, which installs the default set.
+        # shellcheck disable=SC2086
+        set -- $PLAYWRIGHT_BROWSERS
+        bunx playwright install "$@"
 
-    # Browsers themselves are already cached above — only the OS-level dependencies (apt
-    # packages, not part of the cached path) still need installing on a cache hit.
-    - name: Install Playwright system deps (browsers cached)
-      if: inputs.install-playwright == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
+    # Skips a font-only gap on every job; see the same step in setup-bun for the measurement
+    # and why fonts are safe to skip.
+    - name: Install Playwright system deps
+      if: inputs.install-playwright == 'true'
       shell: bash
       working-directory: ${{ inputs.playwright-directory != '' && inputs.playwright-directory || inputs.working-directory }}
       env:
         PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
       run: |
-        if [ -n "$PLAYWRIGHT_BROWSERS" ]; then
-          # shellcheck disable=SC2086
-          bunx playwright install-deps $PLAYWRIGHT_BROWSERS
-        else
-          bunx playwright install-deps
+        # PLAYWRIGHT_BROWSERS may hold multiple space-separated browser names; word-splitting is intentional.
+        # shellcheck disable=SC2086
+        set -- $PLAYWRIGHT_BROWSERS
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          report=$(bunx playwright install-deps --dry-run "$@" 2>&1) || true
+          if printf '%s\n' "$report" | grep -q '^All system dependencies are installed'; then
+            echo "Playwright system dependencies are already installed"
+            exit 0
+          fi
+          if printf '%s\n' "$report" | grep -q '^Missing system dependencies'; then
+            libs=$(printf '%s\n' "$report" | sed -n 's/^  \([^ ]*\)$/\1/p' | grep -Ev '^x?fonts-' || true)
+            if [ -z "$libs" ]; then
+              echo "Only fonts are missing; skipping Playwright install-deps"
+              exit 0
+            fi
+          fi
         fi
+        bunx playwright install-deps "$@"
 
     - name: Disable Next telemetry
       shell: bash

@@ -134,6 +134,10 @@ runs:
           fi
         fi
 
+    # No restore-keys: bun never prunes its store, so restoring an older lockfile's store and
+    # saving it again keeps every stale version. Rethunk-Tech/Website's store had grown to 870MB
+    # compressed (21s restore, 20s save per job); a fresh store for the same lockfile measured
+    # 263MB. A lockfile change now costs one network install instead.
     - name: Cache Bun install store
       id: bun-cache
       if: steps.lockfile.outputs.present == 'true'
@@ -141,8 +145,6 @@ runs:
       with:
         path: ~/.bun/install/cache
         key: ${{ runner.os }}-bun-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}
-        restore-keys: |
-          ${{ runner.os }}-bun-
 
     - name: Cache extra paths
       if: inputs.extra-cache-paths != '' && inputs.extra-cache-key != ''
@@ -202,26 +204,40 @@ runs:
       env:
         PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
       run: |
-        if [ -n "$PLAYWRIGHT_BROWSERS" ]; then
-          # PLAYWRIGHT_BROWSERS may hold multiple space-separated browser names; word-splitting is intentional.
-          # shellcheck disable=SC2086
-          bunx playwright install --with-deps $PLAYWRIGHT_BROWSERS
-        else
-          bunx playwright install --with-deps
-        fi
+        # PLAYWRIGHT_BROWSERS may hold multiple space-separated browser names; word-splitting is
+        # intentional, and an empty value leaves no arguments, which installs the default set.
+        # shellcheck disable=SC2086
+        set -- $PLAYWRIGHT_BROWSERS
+        bunx playwright install "$@"
 
-    # Browsers themselves are already cached above — only the OS-level dependencies (apt
-    # packages, not part of the cached path) still need installing on a cache hit.
-    - name: Install Playwright system deps (browsers cached)
-      if: inputs.install-playwright == 'true' && steps.playwright-cache.outputs.cache-hit == 'true'
+    # apt packages sit outside the browser cache, so this runs on every job. On ubuntu-latest
+    # every Chromium library is preinstalled and install-deps only adds fonts: ~25s of apt
+    # update and install per job (self-test "Playwright cache, warm"), for glyph coverage no
+    # fleet CI job asserts on — albinogeek.com's pixel snapshots run locally, not in CI.
+    # Font-only gaps are therefore skipped; a missing library (webkit, a bare image) still runs
+    # the full install-deps. Output the dry run does not recognise also runs the full install.
+    - name: Install Playwright system deps
+      if: inputs.install-playwright == 'true'
       shell: bash
       working-directory: ${{ inputs.playwright-directory != '' && inputs.playwright-directory || inputs.working-directory }}
       env:
         PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
       run: |
-        if [ -n "$PLAYWRIGHT_BROWSERS" ]; then
-          # shellcheck disable=SC2086
-          bunx playwright install-deps $PLAYWRIGHT_BROWSERS
-        else
-          bunx playwright install-deps
+        # PLAYWRIGHT_BROWSERS may hold multiple space-separated browser names; word-splitting is intentional.
+        # shellcheck disable=SC2086
+        set -- $PLAYWRIGHT_BROWSERS
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          report=$(bunx playwright install-deps --dry-run "$@" 2>&1) || true
+          if printf '%s\n' "$report" | grep -q '^All system dependencies are installed'; then
+            echo "Playwright system dependencies are already installed"
+            exit 0
+          fi
+          if printf '%s\n' "$report" | grep -q '^Missing system dependencies'; then
+            libs=$(printf '%s\n' "$report" | sed -n 's/^  \([^ ]*\)$/\1/p' | grep -Ev '^x?fonts-' || true)
+            if [ -z "$libs" ]; then
+              echo "Only fonts are missing; skipping Playwright install-deps"
+              exit 0
+            fi
+          fi
         fi
+        bunx playwright install-deps "$@"

@@ -172,9 +172,9 @@ to get wrong when writing that kind of test:
   | `'false'` | A `restore-keys` partial match restored something, but not the exact key |
   | `'true'` | Exact key match |
 
-  `setup-bun` and `setup-nextjs-bun` share the same `restore-keys` prefix
-  (`${{ runner.os }}-bun-`) so unrelated projects warm-start each other's Bun install-store
-  cache.
+  The Bun install-store cache deliberately has no `restore-keys`: bun never prunes its store,
+  so a partial restore re-saves every stale version (measured 870MB against a fresh 263MB).
+  `setup-go`'s cache does use them.
 
   On a cold self-test run, assert `cache-hit != 'true'` — not emptiness, which would reject
   the harmless partial-match case when another fixture saved first in parallel.

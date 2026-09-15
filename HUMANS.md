@@ -32,6 +32,10 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 
 Output: `cache-hit` — whether the Bun install-store cache was hit.
 
+`install-playwright` skips `playwright install-deps` when the only missing system packages are
+fonts, which on `ubuntu-latest` is always the case for Chromium. A repo that asserts pixel
+snapshots of CJK or Thai text in CI should install those fonts itself.
+
 **Caching a build directory too** — a path the repo owns that should not be keyed on the
 lockfile, such as a Turborepo `.turbo`. Both inputs are required for the cache to run at all;
 leaving the restore fragment empty restores from any previous extra cache for this OS, which
