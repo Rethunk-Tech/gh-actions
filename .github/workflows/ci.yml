@@ -283,6 +283,51 @@ jobs:
             exit 1
           fi
 
+  # next-app-directory must restore under the app dir, not the working-directory root.
+  test-setup-nextjs-bun-next-app-dir-cold:
+    name: setup-nextjs-bun self-test (next-app-directory cache, cold)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-nextjs-bun
+        with:
+          working-directory: .github/test-fixtures/nextjs-workspace
+          next-app-directory: .github/test-fixtures/nextjs-workspace/apps/web
+      - name: write the marker the warm job has to see
+        run: |
+          mkdir -p .github/test-fixtures/nextjs-workspace/apps/web/.next/cache
+          echo "$GITHUB_SHA" > .github/test-fixtures/nextjs-workspace/apps/web/.next/cache/marker
+
+  test-setup-nextjs-bun-next-app-dir-warm:
+    name: setup-nextjs-bun self-test (next-app-directory cache, warm)
+    needs:
+      - reset-self-test-caches
+      - test-setup-nextjs-bun-next-app-dir-cold
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-nextjs-bun
+        with:
+          working-directory: .github/test-fixtures/nextjs-workspace
+          next-app-directory: .github/test-fixtures/nextjs-workspace/apps/web
+      - name: assert the marker restored under the app dir
+        run: |
+          if [ ! -f .github/test-fixtures/nextjs-workspace/apps/web/.next/cache/marker ]; then
+            echo "::error::next-app-directory did not restore apps/web/.next/cache/marker" >&2
+            exit 1
+          fi
+          if [ "$(cat .github/test-fixtures/nextjs-workspace/apps/web/.next/cache/marker)" != "$GITHUB_SHA" ]; then
+            echo "::error::restored marker is not this run's, got '$(cat .github/test-fixtures/nextjs-workspace/apps/web/.next/cache/marker)'" >&2
+            exit 1
+          fi
+          if [ -f .github/test-fixtures/nextjs-workspace/.next/cache/marker ]; then
+            echo "::error::next-app-directory restored under working-directory/.next/cache instead of the app dir" >&2
+            exit 1
+          fi
+
   # setup-go keys its cache on github.job, so a cold job and a separate warm job could never
   # share an exact key. One job id with two matrix legs does: max-parallel 1 runs them in
   # declared order, and the cold leg's post-step save lands before the warm leg starts.
