@@ -328,6 +328,47 @@ jobs:
             exit 1
           fi
 
+  # Distinct extra-cache-key so these jobs cannot collide with the bun extra-cache pair.
+  test-setup-nextjs-bun-extra-cache-cold:
+    name: setup-nextjs-bun self-test (extra-paths cache, cold)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-nextjs-bun
+        with:
+          working-directory: .github/test-fixtures/nextjs-app
+          extra-cache-paths: .turbo-selftest-nextjs
+          extra-cache-key: ${{ github.sha }}-nextjs
+      - name: write the marker the warm job has to see
+        run: |
+          mkdir -p .turbo-selftest-nextjs
+          echo "$GITHUB_SHA" > .turbo-selftest-nextjs/marker
+
+  test-setup-nextjs-bun-extra-cache-warm:
+    name: setup-nextjs-bun self-test (extra-paths cache, warm)
+    needs: test-setup-nextjs-bun-extra-cache-cold
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-nextjs-bun
+        with:
+          working-directory: .github/test-fixtures/nextjs-app
+          extra-cache-paths: .turbo-selftest-nextjs
+          extra-cache-key: ${{ github.sha }}-nextjs
+      - name: assert the extra path was restored
+        run: |
+          if [ ! -f .turbo-selftest-nextjs/marker ]; then
+            echo "::error::extra-cache-paths did not restore .turbo-selftest-nextjs/marker" >&2
+            exit 1
+          fi
+          if [ "$(cat .turbo-selftest-nextjs/marker)" != "$GITHUB_SHA" ]; then
+            echo "::error::restored marker is not this run's, got '$(cat .turbo-selftest-nextjs/marker)'" >&2
+            exit 1
+          fi
+
   # setup-go keys its cache on github.job, so a cold job and a separate warm job could never
   # share an exact key. One job id with two matrix legs does: max-parallel 1 runs them in
   # declared order, and the cold leg's post-step save lands before the warm leg starts.
