@@ -34,7 +34,7 @@ ask for:
 ## What is not
 
 - **The wrapped third-party actions' own supply chain** (`oven-sh/setup-bun`,
-  `actions/setup-node`, `actions/cache`). This repo SHA-pins each one specifically so a
+  `astral-sh/setup-uv`, `actions/setup-node`, `actions/cache`). This repo SHA-pins each one specifically so a
   compromise upstream requires a new, reviewed pin bump here before it reaches any consumer —
   but a vulnerability in the upstream project itself is that project's to fix and disclose,
   not this repo's.

@@ -16,8 +16,7 @@ No `CHANGELOG.md`, `docs/`, or `specs/` yet — five actions, small enough that 
 version history. Pushing a `v*` tag is the whole release process: `.github/workflows/release.yml`
 turns that tag's own annotation into the GitHub Release, so write the annotation as the release
 notes, and moves the floating `vN` tag to it when it is the newest `vN.M` release. HUMANS.md sends consumers to the releases page to find the current version, so a tag
-without a Release silently makes that instruction wrong — which is exactly what happened to
-v1.8, v1.9 and v1.10 before the workflow existed. Add a changelog once tracking that by tag alone stops scaling.
+without a Release silently makes that instruction wrong. Add a changelog once tracking that by tag alone stops scaling.
 
 ## What this repo is
 
@@ -40,19 +39,12 @@ defaulting to preserving variance.
 
 ## Status
 
-**Shipped (`v1`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`, `setup-rust`.
+**Shipped (`v1.11`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`, `setup-rust`.
 
-`setup-rust` has one caller (`Rethunk-Tech/heft`, 6 setup sites) and was built anyway. heft's
-`Swatinem/rust-cache` and `dtolnay/rust-toolchain` are not GitHub-owned, so every heft job
-depended on third-party actions no org allowlist here vouches for.
-
-`main` deliberately sits ahead of the newest tag (v1.10). The delta is two input *description*
-corrections and nothing else — `setup-bun`'s `skip-install` (it no longer disables the
-install-store cache) and `setup-python`'s `python-version` (it exports `UV_PYTHON`, it does not
-install an interpreter). Verified against the full diff: no change to `runs:`, `steps:`, input
-names, defaults or outputs, so every pinned call site in the fleet already runs current logic.
-Cutting a tag for prose alone was considered and declined — the next behavioural change carries
-these along, and the fleet re-pin comes free with it rather than costing a ~45-repo sweep.
+The newest tag is `v1.11`. `setup-rust` has one caller (`Rethunk-Tech/heft`, 6 setup sites) and
+was built anyway. heft's `Swatinem/rust-cache` and `dtolnay/rust-toolchain` are not
+GitHub-owned, so every heft job depended on third-party actions no org allowlist here vouches
+for.
 
 **Designed, not yet built (`v2`):** `upload-pages`. Deferred, not wrong — a near-pure
 passthrough saving a couple of lines, and it currently has exactly one caller
@@ -141,8 +133,8 @@ passes clean.
 The only thing that catches a broken expression, a bad cache key, or a caching mechanism that
 silently never saves is actually running the action — locally with [`act`](https://github.com/nektos/act)
 before committing, and in CI via `.github/workflows/ci.yml`'s self-test jobs (`test-setup-bun-cold`
-→ `test-setup-bun-warm`, same pattern for `setup-nextjs-bun`, `setup-go` and `setup-python`)
-after. Each gate-bearing action also gets a deliberately-broken fixture proving the gate fires
+→ `test-setup-bun-warm`, same pattern for `setup-nextjs-bun`, `setup-go`, `setup-python` and
+`setup-rust`) after. Each gate-bearing action also gets a deliberately-broken fixture proving the gate fires
 rather than silently no-op'ing — `go-app-broken` (an errcheck violation) and `python-app-broken`
 (an F401 unused import); both compile/import clean, so only the gate can catch them. A few things that are easy
 to get wrong when writing that kind of test:
@@ -162,11 +154,11 @@ to get wrong when writing that kind of test:
   jobs: its cache key contains `github.job`, so two differently-named jobs never share an
   exact key.
 - **The other cold/warm job pairs are duplicated on purpose, once per action.** A duplication scan
-  flags them, and `ci.yml` is now 520 lines across 22 jobs. Collapsing the four pairs into a
-  matrix was measured and rejected: the blocks differ in fixture path, in which output they
-  read (`cache-hit` vs `playwright-cache-hit`), and in what they assert afterwards, so a matrix
-  needs a per-entry escape for most of what actually varies. This file is the only thing that
-  proves any action works; being obvious when it fails outranks being short.
+  flags them. Collapsing the pairs into a matrix was measured and rejected: the blocks differ
+  in fixture path, in which output they read (`cache-hit` vs `playwright-cache-hit`), and in
+  what they assert afterwards, so a matrix needs a per-entry escape for most of what actually
+  varies. This file is the only thing that proves any action works; being obvious when it
+  fails outranks being short.
 - **`actions/cache`'s `cache-hit` output is tri-state, not boolean:**
 
   | Value | Meaning |

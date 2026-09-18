@@ -2,7 +2,7 @@ name: Setup Next.js + Bun
 description: >
   Install Bun, restore its install-store cache, restore Next.js's .next/cache build cache,
   optionally install a Node.js runtime alongside Bun, optionally install Playwright browsers,
-  run `bun install`, and disable Next telemetry. Does not compose setup-bun (see repo README
+  run `bun install`, and disable Next telemetry. Does not compose setup-bun (see AGENTS.md
   for why) — duplicates its core steps directly. Single Next app per next-app-directory; for a
   multi-app repo, call this once per app (each with its own next-app-directory).
 

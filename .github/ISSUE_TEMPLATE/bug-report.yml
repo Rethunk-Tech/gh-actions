@@ -11,6 +11,9 @@ body:
       options:
         - setup-bun
         - setup-nextjs-bun
+        - setup-go
+        - setup-python
+        - setup-rust
         - other / not sure
     validations:
       required: true

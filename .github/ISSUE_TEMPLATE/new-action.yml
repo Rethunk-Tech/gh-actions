@@ -7,9 +7,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        See [AGENTS.md § Status](../../AGENTS.md#status) for actions already designed but
-        not yet built (`setup-go`, `setup-dotnet`, `upload-pages`) before proposing a new one
-        — it may already be scoped.
+        See [AGENTS.md § Status](../../AGENTS.md#status) for the live list of shipped and
+        deferred actions before proposing a new one — it may already be scoped.
   - type: textarea
     id: duplication
     attributes:
@@ -29,6 +28,6 @@ body:
       label: Fits this repo's conventions (see AGENTS.md)
       options:
         - label: No actions/checkout inside the action
-        - label: No lint/build/test steps baked in
+        - label: No build/test steps baked in (documented opt-in lint/security gates excepted)
         - label: Every wrapped action would be SHA-pinned
         - label: "No inline ${{ inputs.* }} interpolation inside run: blocks"
