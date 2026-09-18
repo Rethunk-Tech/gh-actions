@@ -1,9 +1,9 @@
 {
-  "name": "gh-actions-test-fixture-nextjs-workspace",
-  "version": "0.0.0",
-  "private": true,
-  "packageManager": "bun@1.4.0",
-  "dependencies": {
-    "is-number": "7.0.0"
-  }
+	"name": "gh-actions-test-fixture-nextjs-workspace",
+	"version": "0.0.0",
+	"private": true,
+	"packageManager": "bun@1.4.0",
+	"dependencies": {
+		"is-number": "7.0.0"
+	}
 }
