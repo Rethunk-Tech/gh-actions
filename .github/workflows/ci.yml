@@ -369,6 +369,59 @@ jobs:
             exit 1
           fi
 
+  # Distinct Playwright version so playwright-${{ runner.os }}-${version} keys do not collide.
+  test-setup-nextjs-bun-playwright-cold:
+    name: setup-nextjs-bun self-test (Playwright cache, cold)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-nextjs-bun
+        with:
+          working-directory: .github/test-fixtures/nextjs-app-playwright
+          install-playwright: "true"
+          playwright-browsers: chromium
+      - name: assert browser installed and no exact cache hit
+        env:
+          PW_CACHE_HIT: ${{ steps.setup.outputs.playwright-cache-hit }}
+        run: |
+          if [ ! -d ~/.cache/ms-playwright ] || [ -z "$(ls -A ~/.cache/ms-playwright)" ]; then
+            echo "::error::expected Playwright browsers installed under ~/.cache/ms-playwright" >&2
+            exit 1
+          fi
+          if [ "$PW_CACHE_HIT" = "true" ]; then
+            echo "::error::expected no exact Playwright cache-hit on cold run, got 'true'" >&2
+            exit 1
+          fi
+
+  test-setup-nextjs-bun-playwright-warm:
+    name: setup-nextjs-bun self-test (Playwright cache, warm)
+    needs: test-setup-nextjs-bun-playwright-cold
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-nextjs-bun
+        with:
+          working-directory: .github/test-fixtures/nextjs-app-playwright
+          install-playwright: "true"
+          playwright-browsers: chromium
+      - name: assert Playwright cache-hit true
+        env:
+          PW_CACHE_HIT: ${{ steps.setup.outputs.playwright-cache-hit }}
+        run: |
+          if [ "$PW_CACHE_HIT" != "true" ]; then
+            echo "::error::expected Playwright cache-hit=true on warm run, got '$PW_CACHE_HIT'" >&2
+            exit 1
+          fi
+      # The system-deps step skips a font-only gap, so prove Chromium still launches without it.
+      - name: assert Chromium launches
+        working-directory: .github/test-fixtures/nextjs-app-playwright
+        run: node -e "require('@playwright/test').chromium.launch().then((b) => b.close())"
+
   # setup-go keys its cache on github.job, so a cold job and a separate warm job could never
   # share an exact key. One job id with two matrix legs does: max-parallel 1 runs them in
   # declared order, and the cold leg's post-step save lands before the warm leg starts.
