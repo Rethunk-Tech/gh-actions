@@ -28,11 +28,15 @@ jobs:
       # separately; actionlint below is scoped to .github/workflows/*.yml only.
       - name: Schema-validate action.yml files
         run: |
-          uvx check-jsonschema --builtin-schema vendor.github-actions setup-bun/action.yml
-          uvx check-jsonschema --builtin-schema vendor.github-actions setup-nextjs-bun/action.yml
-          uvx check-jsonschema --builtin-schema vendor.github-actions setup-go/action.yml
-          uvx check-jsonschema --builtin-schema vendor.github-actions setup-python/action.yml
-          uvx check-jsonschema --builtin-schema vendor.github-actions setup-rust/action.yml
+          # Glob, not a hardcoded list: a new action directory that never gets added here
+          # would otherwise ship schema-invalid. The undeclared-input check below already globs.
+          shopt -s nullglob
+          files=(*/action.yml)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::no action.yml files found at */action.yml" >&2
+            exit 1
+          fi
+          uvx check-jsonschema --builtin-schema vendor.github-actions "${files[@]}"
 
       # Neither check above can see this: an `inputs.foo` that was never declared resolves to
       # the empty string rather than erroring, so a step gated on one silently never runs.
@@ -369,7 +373,9 @@ jobs:
             exit 1
           fi
 
-  # Distinct Playwright version so playwright-${{ runner.os }}-${version} keys do not collide.
+  # Distinct Playwright version (1.55.1) so playwright-${{ runner.os }}-${version} keys do not
+  # collide with setup-bun's 1.63.0 fixture. Those two used to share 1.63.0, so a parallel
+  # cold pair raced one cache key.
   test-setup-nextjs-bun-playwright-cold:
     name: setup-nextjs-bun self-test (Playwright cache, cold)
     needs: reset-self-test-caches
@@ -386,9 +392,14 @@ jobs:
       - name: assert browser installed and no exact cache hit
         env:
           PW_CACHE_HIT: ${{ steps.setup.outputs.playwright-cache-hit }}
+          PW_VERSION: ${{ steps.setup.outputs.playwright-version }}
         run: |
           if [ ! -d ~/.cache/ms-playwright ] || [ -z "$(ls -A ~/.cache/ms-playwright)" ]; then
             echo "::error::expected Playwright browsers installed under ~/.cache/ms-playwright" >&2
+            exit 1
+          fi
+          if [ "$PW_VERSION" != "1.55.1" ]; then
+            echo "::error::expected playwright-version=1.55.1 (distinct from setup-bun's 1.63.0 fixture so the cache keys cannot collide), got '$PW_VERSION'" >&2
             exit 1
           fi
           if [ "$PW_CACHE_HIT" = "true" ]; then
@@ -529,9 +540,14 @@ jobs:
       - name: assert browser installed and no exact cache hit
         env:
           PW_CACHE_HIT: ${{ steps.setup.outputs.playwright-cache-hit }}
+          PW_VERSION: ${{ steps.setup.outputs.playwright-version }}
         run: |
           if [ ! -d ~/.cache/ms-playwright ] || [ -z "$(ls -A ~/.cache/ms-playwright)" ]; then
             echo "::error::expected Playwright browsers installed under ~/.cache/ms-playwright" >&2
+            exit 1
+          fi
+          if [ "$PW_VERSION" != "1.63.0" ]; then
+            echo "::error::expected playwright-version=1.63.0, got '$PW_VERSION'" >&2
             exit 1
           fi
           if [ "$PW_CACHE_HIT" = "true" ]; then
@@ -564,6 +580,76 @@ jobs:
       - name: assert Chromium launches
         working-directory: .github/test-fixtures/bun-app-playwright
         run: node -e "require('@playwright/test').chromium.launch().then((b) => b.close())"
+
+  # playwright-directory is the Bastion/caldera/prepaudit shape: bun.lock (and skip-install) at
+  # the workspace root, @playwright/test pinned only under apps/web. Resolving against the root
+  # package.json would cache as "unpinned" and never invalidate on a browser bump. Distinct
+  # 1.52.0 so this pair cannot collide with the 1.63.0 / 1.55.1 Playwright self-tests.
+  test-setup-bun-playwright-directory-cold:
+    name: setup-bun self-test (playwright-directory, skip-install, cold)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-workspace-playwright
+          skip-install: "true"
+          install-playwright: "true"
+          playwright-directory: .github/test-fixtures/bun-workspace-playwright/apps/web
+          playwright-browsers: chromium
+      - name: assert pin came from apps/web and the root install was skipped
+        env:
+          PW_CACHE_HIT: ${{ steps.setup.outputs.playwright-cache-hit }}
+          PW_VERSION: ${{ steps.setup.outputs.playwright-version }}
+        run: |
+          if [ "$PW_VERSION" != "1.52.0" ]; then
+            echo "::error::expected playwright-version=1.52.0 from apps/web, got '$PW_VERSION' (unpinned means it read the root package.json)" >&2
+            exit 1
+          fi
+          if [ -d .github/test-fixtures/bun-workspace-playwright/node_modules ]; then
+            echo "::error::skip-install ran bun install at the workspace root anyway" >&2
+            exit 1
+          fi
+          if [ ! -d ~/.cache/ms-playwright ] || [ -z "$(ls -A ~/.cache/ms-playwright)" ]; then
+            echo "::error::expected Playwright browsers installed under ~/.cache/ms-playwright" >&2
+            exit 1
+          fi
+          if [ "$PW_CACHE_HIT" = "true" ]; then
+            echo "::error::expected no exact Playwright cache-hit on cold run, got 'true'" >&2
+            exit 1
+          fi
+
+  test-setup-bun-playwright-directory-warm:
+    name: setup-bun self-test (playwright-directory, skip-install, warm)
+    needs: test-setup-bun-playwright-directory-cold
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-workspace-playwright
+          skip-install: "true"
+          install-playwright: "true"
+          playwright-directory: .github/test-fixtures/bun-workspace-playwright/apps/web
+          playwright-browsers: chromium
+      - name: assert Playwright cache-hit true and the pin still came from apps/web
+        env:
+          PW_CACHE_HIT: ${{ steps.setup.outputs.playwright-cache-hit }}
+          PW_VERSION: ${{ steps.setup.outputs.playwright-version }}
+        run: |
+          if [ "$PW_VERSION" != "1.52.0" ]; then
+            echo "::error::expected playwright-version=1.52.0 from apps/web, got '$PW_VERSION'" >&2
+            exit 1
+          fi
+          if [ "$PW_CACHE_HIT" != "true" ]; then
+            echo "::error::expected Playwright cache-hit=true on warm run, got '$PW_CACHE_HIT'" >&2
+            exit 1
+          fi
 
   test-setup-go-lint-vuln-pass:
     name: setup-go self-test (lint + govulncheck, clean fixture)
@@ -710,3 +796,19 @@ jobs:
           working-directory: .github
           skip-install: "true"
       - run: uv --version
+
+  # repo-ops' audit job: skip-install + run-audit, because uv audit --locked reads uv.lock
+  # rather than the synced environment. Without this, a regression that gates audit behind
+  # sync would silently no-op that caller (schema validation cannot see a step `if:`).
+  test-setup-python-skip-install-audit:
+    name: setup-python self-test (skip-install still audits)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-python
+        with:
+          working-directory: .github/test-fixtures/python-app
+          skip-install: "true"
+          run-audit: "true"
