@@ -188,8 +188,8 @@ runs:
         dir="$RUNNER_TEMP/setup-go-golangci-lint"
         mkdir -p "$dir"
         cd "$dir" || exit 1
-        curl -fsSL --retry 3 -o "$base.tar.gz" "$url/$base.tar.gz"
-        curl -fsSL --retry 3 -o checksums.txt "$url/golangci-lint-$version-checksums.txt"
+        curl -fsSL --retry 5 --retry-all-errors --retry-max-time 120 -o "$base.tar.gz" "$url/$base.tar.gz"
+        curl -fsSL --retry 5 --retry-all-errors --retry-max-time 120 -o checksums.txt "$url/golangci-lint-$version-checksums.txt"
         grep " $base.tar.gz\$" checksums.txt > expected.txt || {
           echo "::error::$base.tar.gz is not listed in the v$version checksums file" >&2
           exit 1

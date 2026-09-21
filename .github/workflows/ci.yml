@@ -101,11 +101,32 @@ jobs:
         run: |
           # --ref cannot be combined with a numeric cache ID (only with a key string). IDs are
           # already unambiguous, so no --ref is needed on the delete call itself.
-          for prefix in Linux-bun- Linux-nextjs- setup-go-Linux- setup-go-lint- setup-rust- playwright-Linux- Linux-bun-extra- setup-uv-; do
-            for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id'); do
-              gh cache delete "$id" --repo "$GITHUB_REPOSITORY"
+          prefixes='Linux-bun- Linux-nextjs- setup-go-Linux- setup-go-lint- setup-rust- playwright-Linux- Linux-bun-extra- setup-uv-'
+
+          # A single transient 5xx from the cache API used to abort this step, leaving the
+          # caches warm so every cold-cache assertion downstream failed for the wrong reason.
+          # Retry each delete, then verify emptiness: a cache that genuinely survives still
+          # fails the job, which is what keeps the cold assertions meaningful.
+          for attempt in 1 2 3; do
+            for prefix in $prefixes; do
+              for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id'); do
+                gh cache delete "$id" --repo "$GITHUB_REPOSITORY" || true
+              done
             done
+            remaining=0
+            for prefix in $prefixes; do
+              n=$(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id' | wc -l)
+              remaining=$((remaining + n))
+            done
+            [ "$remaining" -eq 0 ] && break
+            echo "cache delete attempt $attempt left $remaining cache(s); retrying" >&2
+            sleep $((attempt * 5))
           done
+
+          if [ "$remaining" -ne 0 ]; then
+            echo "::error::$remaining self-test cache(s) survived deletion; cold-cache assertions would be meaningless" >&2
+            exit 1
+          fi
 
   # Each action gets a cold-cache job (proves install works, no exact cache hit) followed by
   # a warm-cache job (needs: <cold job>, so it only starts after the cold job's cache save
