@@ -30,11 +30,15 @@ Generic Bun toolchain + install + cache. No framework assumptions.
     #                                 # install; defaults to working-directory
 ```
 
-Output: `cache-hit` — whether the Bun install-store cache was hit.
+Outputs: `cache-hit` — whether the Bun install-store cache was hit. `playwright-cache-hit`
+and `playwright-version` are set when `install-playwright` is on (`playwright-version` is
+`unpinned` if no package.json at `playwright-directory` names a pin).
 
 `install-playwright` skips `playwright install-deps` when the only missing system packages are
 fonts, which on `ubuntu-latest` is always the case for Chromium. A repo that asserts pixel
-snapshots of CJK or Thai text in CI should install those fonts itself.
+snapshots of CJK or Thai text in CI should install those fonts itself. Combined with
+`skip-install`, browsers still install: the CLI is `bunx playwright@<pin>` from
+`playwright-directory`'s package.json, not an unpinned `bunx playwright`.
 
 **Caching a build directory too** — a path the repo owns that should not be keyed on the
 lockfile, such as a Turborepo `.turbo`. Both inputs are required for the cache to run at all;
@@ -89,7 +93,8 @@ key) — set `next-app-directory` separately from `working-directory`:
 
 Leave `next-app-directory` unset for a single-app repo — it defaults to `working-directory`.
 
-Output: `cache-hit` — whether the Bun install-store cache was hit.
+Outputs: `cache-hit` — whether the Bun install-store cache was hit. Same Playwright
+outputs as `setup-bun` when `install-playwright` is on.
 
 ### `setup-go`
 
