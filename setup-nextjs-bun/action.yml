@@ -85,6 +85,13 @@ outputs:
   playwright-cache-hit:
     description: Whether the Playwright browser cache was hit (empty when install-playwright is off).
     value: ${{ steps.playwright-cache.outputs.cache-hit }}
+  playwright-version:
+    description: >
+      @playwright/test (or playwright) version hashed into the browser cache key. Empty when
+      install-playwright is off. "unpinned" when no package.json exists at playwright-directory
+      (or working-directory) to read a pin from — the cache still runs, it just does not
+      invalidate on a version bump.
+    value: ${{ steps.playwright-version.outputs.version }}
 
 runs:
   using: composite
@@ -187,12 +194,20 @@ runs:
       working-directory: ${{ inputs.playwright-directory != '' && inputs.playwright-directory || inputs.working-directory }}
       env:
         PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
+        PLAYWRIGHT_VERSION: ${{ steps.playwright-version.outputs.version }}
       run: |
         # PLAYWRIGHT_BROWSERS may hold multiple space-separated browser names; word-splitting is
         # intentional, and an empty value leaves no arguments, which installs the default set.
         # shellcheck disable=SC2086
         set -- $PLAYWRIGHT_BROWSERS
-        bunx playwright install "$@"
+        # Pin the CLI to the same version the cache key used. skip-install (no node_modules)
+        # would otherwise let bunx fetch whatever "playwright" resolves to today, then save
+        # those browsers under the package.json pin — a later job restores a mismatched build.
+        if [ -n "$PLAYWRIGHT_VERSION" ] && [ "$PLAYWRIGHT_VERSION" != "unpinned" ]; then
+          bunx "playwright@$PLAYWRIGHT_VERSION" install "$@"
+        else
+          bunx playwright install "$@"
+        fi
 
     # Skips a font-only gap on every job; see the same step in setup-bun for the measurement
     # and why fonts are safe to skip.
@@ -202,12 +217,20 @@ runs:
       working-directory: ${{ inputs.playwright-directory != '' && inputs.playwright-directory || inputs.working-directory }}
       env:
         PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
+        PLAYWRIGHT_VERSION: ${{ steps.playwright-version.outputs.version }}
       run: |
         # PLAYWRIGHT_BROWSERS may hold multiple space-separated browser names; word-splitting is intentional.
         # shellcheck disable=SC2086
         set -- $PLAYWRIGHT_BROWSERS
+        pw() {
+          if [ -n "$PLAYWRIGHT_VERSION" ] && [ "$PLAYWRIGHT_VERSION" != "unpinned" ]; then
+            bunx "playwright@$PLAYWRIGHT_VERSION" "$@"
+          else
+            bunx playwright "$@"
+          fi
+        }
         if [ "$RUNNER_OS" = "Linux" ]; then
-          report=$(bunx playwright install-deps --dry-run "$@" 2>&1) || true
+          report=$(pw install-deps --dry-run "$@" 2>&1) || true
           if printf '%s\n' "$report" | grep -q '^All system dependencies are installed'; then
             echo "Playwright system dependencies are already installed"
             exit 0
@@ -220,7 +243,7 @@ runs:
             fi
           fi
         fi
-        bunx playwright install-deps "$@"
+        pw install-deps "$@"
 
     - name: Disable Next telemetry
       shell: bash
