@@ -759,9 +759,11 @@ jobs:
             exit 1
           fi
 
+  # Jobs sharing python-app's lockfile wait for the cold job: a parallel save under the same
+  # key would turn its miss into a hit.
   test-setup-python-gates-pass:
     name: setup-python self-test (ruff + format + audit, clean fixture)
-    needs: reset-self-test-caches
+    needs: test-setup-python-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -823,7 +825,7 @@ jobs:
   # sync would silently no-op that caller (schema validation cannot see a step `if:`).
   test-setup-python-skip-install-audit:
     name: setup-python self-test (skip-install still audits)
-    needs: reset-self-test-caches
+    needs: test-setup-python-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
