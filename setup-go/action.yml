@@ -132,9 +132,8 @@ runs:
     # caches. The job id sits last in the key so that each job keeps its own build profile
     # (claude-format-hooks: lint saved first and every later -race test job restored a cache
     # with no race builds, 34-38s warm). A job's first run, or a dependency change, falls back
-    # to the newest cache of any job for the same Go version. Growth is bounded: Go trims build
-    # entries unused for five days before the post step saves, and a Go release resets the
-    # prefix entirely.
+    # to the newest cache of any job for the same Go version, and the prune step below bounds
+    # what that fallback carries forward.
     - name: Cache Go modules and build cache
       id: go-cache
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -146,6 +145,23 @@ runs:
         restore-keys: |
           setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-
           setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
+
+    # Go's own trim only drops entries unused for five days, so each dependency change stacks
+    # a new build generation on the restored one until the runner's disk fills. Go bumps an
+    # entry's mtime when a build uses it and the mtime is over an hour old, so the entries the
+    # saving job used all sit within its duration plus an hour of the newest one; keep those and
+    # drop the rest. A job over an hour long can lose some of its own entries, which costs a
+    # rebuild of them, not correctness.
+    - name: Prune build cache to the saving job's working set
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        [ -d "$SETUP_GO_BUILD_CACHE" ] || exit 0
+        newest=$(find "$SETUP_GO_BUILD_CACHE" -type f -printf '%T@\n' | sort -n | tail -1)
+        [ -n "$newest" ] || exit 0
+        before=$(du -sm "$SETUP_GO_BUILD_CACHE" | cut -f1)
+        find "$SETUP_GO_BUILD_CACHE" -type f ! -newermt "@$(( ${newest%.*} - 7200 ))" -delete
+        echo "Go build cache pruned from ${before} MB to $(du -sm "$SETUP_GO_BUILD_CACHE" | cut -f1) MB"
 
     # The golangci-lint binary is downloaded rather than cached: the release fetch measured
     # 0.6s (bastion-mfa), no faster than a cache round trip. Its own analysis cache is filled

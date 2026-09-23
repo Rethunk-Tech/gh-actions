@@ -174,7 +174,9 @@ to get wrong when writing that kind of test:
 
   The Bun install-store cache deliberately has no `restore-keys`: bun never prunes its store,
   so a partial restore re-saves every stale version (measured 870MB against a fresh 263MB).
-  `setup-go`'s cache does use them.
+  `setup-go`'s cache does use them, and after restoring prunes the Go build cache to the
+  entries the saving job used, since Go's own five-day trim lets each dependency change stack
+  another build generation until the runner's disk fills.
 
   On a cold self-test run, assert `cache-hit != 'true'` — not emptiness, which would reject
   the harmless partial-match case when another fixture saved first in parallel.
