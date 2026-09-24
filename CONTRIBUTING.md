@@ -31,10 +31,10 @@ Conventional commits: `type(scope): subject`, e.g. `feat(setup-go): add Go toolc
 ## Adding a new action
 
 - New directory at the repo root, `action.yml` inside it — not nested deeper.
-- Follow the conventions in [AGENTS.md](AGENTS.md): no `checkout`, no build/test steps
-  (opt-in lint/security gates on `setup-go` and `setup-python` are the documented exception —
-  see AGENTS.md), every wrapped action SHA-pinned with a version comment, no bare `${{ inputs.* }}`
-  interpolation inside `run:`.
+- Follow the conventions in [AGENTS.md](AGENTS.md): no `checkout`, no project-specific
+  build/test steps (the standardized opt-in `setup-go` race gate and lint/security gates are the
+  documented exceptions — see AGENTS.md), every wrapped action SHA-pinned with a version comment,
+  no bare `${{ inputs.* }}` interpolation inside `run:`.
 - Add a committed fixture under `.github/test-fixtures/` if the action needs one for CI
   self-testing, and wire a cold/warm job pair into `.github/workflows/ci.yml` following the
   existing `test-setup-bun-*` jobs as the template. If it shares a lockfile-based cache key

@@ -99,7 +99,8 @@ outputs as `setup-bun` when `install-playwright` is on.
 ### `setup-go`
 
 Go toolchain via `actions/setup-go`, plus a module/build cache keyed per job. Optionally also
-runs golangci-lint and/or govulncheck as a gate on the same job — opt-in, off by default.
+runs `go test -race ./...`, golangci-lint, and/or govulncheck as gates on the same job — opt-in,
+off by default.
 
 ```yaml
 - uses: actions/checkout@v7
@@ -112,10 +113,22 @@ runs golangci-lint and/or govulncheck as a gate on the same job — opt-in, off 
 
 Outputs: `go-version`, `cache-hit` (an exact key match for this job).
 
-The cache key is Go version + dependency hash + job id, so a `lint` job and a `go test -race` job
-each restore the build cache they filled themselves. A job's first run, or a dependency bump,
-falls back to the newest cache any job saved for the same Go version. Matrix legs share one job
-id and therefore one cache entry.
+The cache key is Go version + dependency hash + job id, so a job with `run-test-race` enabled and
+a lint-only job each restore the build cache they filled themselves — a lint job's cache is never
+the race-test cache. A job's first run, or a dependency bump, falls back to the newest cache any
+job saved for the same Go version. Matrix legs share one job id and therefore one cache entry.
+
+**Race-test gate** — set `run-test-race` to `"true"` in the job that owns the module's test gate.
+It runs `go test -race ./...` from the directory named by `go-version-file` (or the matching
+`cache-dependency-path` when that is the path used to locate the module). The input defaults to
+`"false"` so existing setup-only and lint/vuln-only callers do not start running tests.
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.11
+  with:
+    run-test-race: "true"
+    go-version-file: backend/go.mod
+```
 
 **Lint + vuln gate** — both run from the same directory `go-version-file`/`cache-dependency-path`
 already names (no separate `working-directory` input needed), each `continue-on-error` behind
@@ -125,6 +138,7 @@ a final gate step, so enabling both still surfaces both findings even if one fai
 - uses: Rethunk-Tech/gh-actions/setup-go@v1.11
   with:
     run-lint: "true"                 # Linux and macOS runners; binary checksum-verified per run
+    # run-test-race: "false"         # default; keep this a lint/vuln-only job
     # lint-version: v2.13.2          # default: built with go1.27, matching the fleet's modules
     # lint-args: --timeout 5m
     run-govulncheck: "true"

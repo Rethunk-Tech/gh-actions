@@ -1,8 +1,8 @@
 name: Setup Go
 description: >
   Install a Go toolchain via actions/setup-go and cache its module and build caches per job.
-  Optionally also run golangci-lint and/or govulncheck as a gate on the same job — opt-in, off
-  by default. Writes a pass/fail table to the job's step summary.
+  Optionally also run the race-enabled test suite, golangci-lint, and/or govulncheck as gates on
+  the same job — opt-in, off by default. Writes a pass/fail table to the job's step summary.
 
 inputs:
   go-version:
@@ -15,9 +15,9 @@ inputs:
     description: >
       Path to the go.mod (or go.work) file to resolve the Go version from. Only used when
       go-version is empty. May point into a subdirectory (e.g. "backend/go.mod") when the
-      module isn't at the checkout root — the lint/govulncheck steps below run from that same
-      subdirectory automatically, with no separate working-directory input: every real fleet
-      case that needs one needs the exact directory go-version-file already names.
+      module isn't at the checkout root — the test/lint/govulncheck steps below run from that
+      same subdirectory automatically, with no separate working-directory input: every real
+      fleet case that needs one needs the exact directory go-version-file already names.
     required: false
     default: go.mod
   cache-dependency-path:
@@ -26,6 +26,12 @@ inputs:
       Leave empty to default to the go.sum next to go-version-file plus go-version-file itself.
     required: false
     default: ""
+  run-test-race:
+    description: >
+      When true, runs `go test -race ./...` from the module directory after the toolchain is set
+      up. Turns this action into a test gate for callers who opt in — off by default.
+    required: false
+    default: "false"
   run-lint:
     description: >
       When true, downloads golangci-lint (checksum-verified against its release) and runs it
@@ -96,7 +102,7 @@ runs:
       env:
         GO_VERSION_FILE: ${{ inputs.go-version-file }}
         CACHE_DEPENDENCY_PATH: ${{ inputs.cache-dependency-path }}
-        NEEDS_DIR: ${{ inputs.run-lint == 'true' || inputs.run-govulncheck == 'true' }}
+        NEEDS_DIR: ${{ inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-govulncheck == 'true' }}
       run: |
         if [ -n "$CACHE_DEPENDENCY_PATH" ]; then
           path="$CACHE_DEPENDENCY_PATH"
@@ -115,7 +121,7 @@ runs:
         case "$path" in
           *$'\n'*|*'*'*)
             if [ "$NEEDS_DIR" = "true" ]; then
-              echo "::error::run-lint/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave run-lint/run-govulncheck off for this caller." >&2
+              echo "::error::run-test-race/run-lint/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave the gate inputs off for this caller." >&2
               exit 1
             fi
             ;;
@@ -128,7 +134,7 @@ runs:
           echo "SETUP_GO_MOD_CACHE=$(go env GOMODCACHE)"
         } >> "$GITHUB_ENV"
 
-    # Saved in the post step, after the caller's own build/test commands have filled both
+    # Saved in the post step, after the caller's own build/test commands and any action gates have filled both
     # caches. The job id sits last in the key so that each job keeps its own build profile
     # (claude-format-hooks: lint saved first and every later -race test job restored a cache
     # with no race builds, 34-38s warm). A job's first run, or a dependency change, falls back
@@ -214,11 +220,18 @@ runs:
         tar -xzf "$base.tar.gz"
         echo "bin=$dir/$base/golangci-lint" >> "$GITHUB_OUTPUT"
 
-    # Both gates below run with continue-on-error: true and report through the final gate step
-    # rather than failing fast — a caller with both enabled sees BOTH findings in one run,
-    # matching what bastion-intent-ledger-replicator/BoundMCP already get from running lint and
-    # govulncheck as independent jobs today. A masked continue-on-error failure still shows its
-    # own warning icon in the Actions UI, so each tool's result stays individually visible.
+    # Every gate below runs with continue-on-error: true and reports through the final gate step
+    # rather than failing fast, so a caller enabling more than one sees every finding in one run.
+    # A masked continue-on-error failure still shows its own warning icon in the Actions UI, so
+    # each tool's result stays individually visible.
+    - name: go test -race
+      id: test-race
+      if: inputs.run-test-race == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ steps.moddir.outputs.dir }}
+      run: go test -race ./...
+
     - name: golangci-lint
       id: lint
       if: inputs.run-lint == 'true'
@@ -274,12 +287,14 @@ runs:
     # own vuln-gate.sh auto-files GitHub issues per CVE) this generic fleet action has no
     # business opinionating about. A caller that wants that keeps its own downstream step
     # reading govulncheck's `-json` output directly instead of enabling run-govulncheck here.
-    - name: Gate on lint/govulncheck results
-      if: inputs.run-lint == 'true' || inputs.run-govulncheck == 'true'
+    - name: Gate on test/lint/govulncheck results
+      if: inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-govulncheck == 'true'
       shell: bash
       env:
+        RUN_TEST_RACE: ${{ inputs.run-test-race }}
         RUN_LINT: ${{ inputs.run-lint }}
         RUN_VULN: ${{ inputs.run-govulncheck }}
+        TEST_RACE_OUTCOME: ${{ steps.test-race.outcome }}
         LINT_OUTCOME: ${{ steps.lint.outcome }}
         VULN_OUTCOME: ${{ steps.govulncheck.outcome }}
       run: |
@@ -294,14 +309,19 @@ runs:
           fi
         }
         {
-          echo "## setup-go lint/vuln gate"
+          echo "## setup-go test/lint/vuln gate"
           echo "| Check | Result |"
           echo "| --- | --- |"
         } >> "$GITHUB_STEP_SUMMARY"
+        row "$RUN_TEST_RACE" "$TEST_RACE_OUTCOME" "go test -race"
         row "$RUN_LINT" "$LINT_OUTCOME" "golangci-lint"
         row "$RUN_VULN" "$VULN_OUTCOME" "govulncheck"
 
         failed=0
+        if [ "$TEST_RACE_OUTCOME" = "failure" ]; then
+          echo "::error::go test -race failed — see the go test -race step above" >&2
+          failed=1
+        fi
         if [ "$LINT_OUTCOME" = "failure" ]; then
           echo "::error::golangci-lint found issues — see the golangci-lint step above" >&2
           failed=1

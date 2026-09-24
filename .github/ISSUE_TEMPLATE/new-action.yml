@@ -28,6 +28,6 @@ body:
       label: Fits this repo's conventions (see AGENTS.md)
       options:
         - label: No actions/checkout inside the action
-        - label: No build/test steps baked in (documented opt-in lint/security gates excepted)
+        - label: No project-specific build/test steps baked in (documented setup-go race and lint/security gates excepted)
         - label: Every wrapped action would be SHA-pinned
         - label: "No inline ${{ inputs.* }} interpolation inside run: blocks"

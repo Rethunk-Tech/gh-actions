@@ -73,9 +73,11 @@ different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `u
 
 - **No `actions/checkout`.** The caller does that first, before the `uses:` line — standard
   composite-action convention.
-- **No build/test steps** — those are project-defined commands that vary too much per repo to
-  centralize; stays the caller's own job step. **Lint/security-gate steps are the one
-  deliberate exception** (`setup-go`'s opt-in `run-lint`/`run-govulncheck` and `setup-python`'s
+- **No project-specific build/test steps** — those are commands that vary too much per repo to
+  centralize; they stay in the caller's own job. The standardized `setup-go` race gate is the
+  deliberate test exception: its opt-in `run-test-race` always runs the canon command
+  `go test -race ./...`. **Lint/security-gate steps are the other deliberate exception**
+  (`setup-go`'s opt-in `run-lint`/`run-govulncheck` and `setup-python`'s
   `run-ruff`/`run-ruff-format`/`run-audit`, all off by default):
   unlike build/test, every real fleet caller invokes the exact same tools for its language
   (`golangci-lint` and `govulncheck` for Go; `ruff` and `uv audit` for Python) with only
