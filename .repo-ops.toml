@@ -1,0 +1,4 @@
+# Every workspace under .github/test-fixtures/ is a fixture pinned to exercise the actions,
+# and go-app-broken / python-app-broken are meant to stay broken: bumping them changes what
+# the tests test. The repo's own pins and actions are swept as usual.
+exclude = [".github/test-fixtures/*"]
