@@ -12,11 +12,10 @@ here, read [HUMANS.md](HUMANS.md).
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Process — commit style, testing, how to add a new action |
 | [SECURITY.md](SECURITY.md) | Vulnerability reporting and trust boundary |
 
-No `CHANGELOG.md`, `docs/`, or `specs/` yet — five actions, small enough that git tags carry the
-version history. Pushing a `v*` tag is the whole release process: `.github/workflows/release.yml`
+Git tags carry the version history; there is no `CHANGELOG.md`. Pushing a `v*` tag is the whole release process: `.github/workflows/release.yml`
 turns that tag's own annotation into the GitHub Release, so write the annotation as the release
 notes, and moves the floating `vN` tag to it when it is the newest `vN.M` release. HUMANS.md sends consumers to the releases page to find the current version, so a tag
-without a Release silently makes that instruction wrong. Add a changelog once tracking that by tag alone stops scaling.
+without a Release silently makes that instruction wrong.
 
 ## What this repo is
 
@@ -39,9 +38,9 @@ defaulting to preserving variance.
 
 ## Status
 
-**Shipped (`v1.13`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`, `setup-rust`.
+**Shipped:** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`, `setup-rust`.
 
-The newest tag is `v1.13`. `setup-rust` has one caller (`Rethunk-Tech/heft`, 6 setup sites) and
+`setup-rust` has one caller (`Rethunk-Tech/heft`, 6 setup sites) and
 was built anyway. heft's `Swatinem/rust-cache` and `dtolnay/rust-toolchain` are not
 GitHub-owned, so every heft job depended on third-party actions no org allowlist here vouches
 for.
@@ -64,8 +63,8 @@ note. Re-measure before proposing any of them again; the counts, not the idea, a
 | `setup-dotnet` | any caller with CI | 0 — the fleet's only `.csproj`/`.sln` (`LethalModding/Radar_Ident_QuickSwitch`) has no `.github/` at all | Dropped |
 | `setup-node` | 2+ caller repos needing more than a passthrough | 5 sites / 4 repos, but 4 are a bare `node-version: "24"` with no install or cache to share — Node as a runtime for `make verify` or syft. `setup-bun`'s own `node-version` input already covers the Bun-adjacent case | Passthrough, dropped |
 
-`setup-python`, by contrast, cleared the bar outright when it was built: 15 hand-rolled setup
-sites across 10 workflows in 6 repos, already split across four incompatible variants
+`setup-python`, by contrast, cleared the bar outright: 15 hand-rolled setup
+hand-rolled sites across 10 workflows in 6 repos, split across four incompatible variants
 (`enable-cache` present vs absent, uv version pinned vs floating, and Python selected three
 different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `uv python install`).
 
@@ -82,9 +81,8 @@ different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `u
   unlike build/test, every real fleet caller invokes the exact same tools for its language
   (`golangci-lint` and `govulncheck` for Go; `ruff` and `uv audit` for Python) with only
   their version/args varying — real passthrough inputs, not a project-defined verb — and
-  centralizing them converges the fleet onto one reviewed SHA pin instead of the 17
-  independently-drifting ones the fleet carried before it — now zero, verified by grepping
-  every caller. Each such gate runs
+  centralizing them converges the fleet onto one reviewed SHA pin instead of
+  per-repo pins. Each such gate runs
   with `continue-on-error: true` behind a final gate step (never plain fail-fast) so enabling
   more than one still surfaces every finding in one run. A caller whose exact invocation
   doesn't fit (custom JSON-gating, non-cancelling separate jobs by design) just doesn't set the
