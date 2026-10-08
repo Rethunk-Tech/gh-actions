@@ -39,9 +39,9 @@ defaulting to preserving variance.
 
 ## Status
 
-**Shipped (`v1.11`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`, `setup-rust`.
+**Shipped (`v1.13`):** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`, `setup-rust`.
 
-The newest tag is `v1.11`. `setup-rust` has one caller (`Rethunk-Tech/heft`, 6 setup sites) and
+The newest tag is `v1.13`. `setup-rust` has one caller (`Rethunk-Tech/heft`, 6 setup sites) and
 was built anyway. heft's `Swatinem/rust-cache` and `dtolnay/rust-toolchain` are not
 GitHub-owned, so every heft job depended on third-party actions no org allowlist here vouches
 for.
@@ -213,7 +213,7 @@ a public answer.
 
 ## Why `oven-sh/setup-bun` and not a hand-rolled install
 
-The one non-`actions/*` dependency in this repo. `oven-sh` is the same org that publishes Bun
+One of two non-`actions/*` dependencies in this repo (the other is `astral-sh/setup-uv`). `oven-sh` is the same org that publishes Bun
 itself (not an unrelated third party), `setup-bun` is actively maintained and SHA-pins its own
 dependencies internally, and it does real work that would have to be reimplemented to drop it — Windows needs a genuinely different install mechanism
 than Linux/macOS, and this repo's own `bun-version-file` fallback (reading a version from
