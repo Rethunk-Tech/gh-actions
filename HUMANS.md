@@ -139,10 +139,10 @@ a final gate step, so enabling both still surfaces both findings even if one fai
   with:
     run-lint: "true"                 # Linux and macOS runners; binary checksum-verified per run
     # run-test-race: "false"         # default; keep this a lint/vuln-only job
-    # lint-version: v2.13.2          # default: built with go1.27, matching the fleet's modules
+    # lint-version: v2.14.0          # default: built with go1.27, matching the fleet's modules
     # lint-args: --timeout 5m
     run-govulncheck: "true"
-    # govulncheck-version: v1.7.0    # default: fleet-latest as of this writing
+    # govulncheck-version: v1.8.0    # default: fleet-latest as of this writing
     # govulncheck-args: -tags=foo
 ```
 
