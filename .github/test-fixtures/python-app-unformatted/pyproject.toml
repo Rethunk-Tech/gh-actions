@@ -1,0 +1,14 @@
+[project]
+name = "python-app-unformatted-fixture"
+version = "0.0.0"
+description = "Fixture that is lint-clean but not ruff-formatted, proving setup-python's format gate fires."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["ruff>=0.15.0"]
+
+# A fixture is never installed as a package — this keeps `uv sync` to just the dependency
+# groups, with no build backend to configure or keep working.
+[tool.uv]
+package = false

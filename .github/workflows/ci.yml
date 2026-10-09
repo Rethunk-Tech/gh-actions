@@ -722,6 +722,58 @@ jobs:
             exit 1
           fi
 
+  # Proves the run-test-race gate fires: a fixture whose only test races on one variable passes
+  # without -race and fails under it.
+  test-setup-go-race-catches-real-race:
+    name: setup-go self-test (race gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-app-race/go.mod
+          run-test-race: "true"
+      - name: assert the race gate failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          RACE: ${{ steps.setup.outputs.test-race-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$RACE" != "failure" ]; then
+            echo "::error::expected the race gate to fail on a racy fixture, got composite '$OUTCOME', race '$RACE'" >&2
+            exit 1
+          fi
+
+  # Proves the run-ruff-format gate fires: a fixture that is ruff-check clean but not formatted.
+  test-setup-python-ruff-format-catches-unformatted:
+    name: setup-python self-test (ruff format gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-python
+        with:
+          working-directory: .github/test-fixtures/python-app-unformatted
+          install-args: --locked --group dev
+          run-ruff: "true"
+          run-ruff-format: "true"
+      - name: assert only the format gate failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          RUFF: ${{ steps.setup.outputs.ruff-outcome }}
+          FORMAT: ${{ steps.setup.outputs.ruff-format-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$FORMAT" != "failure" ] || [ "$RUFF" != "success" ]; then
+            echo "::error::expected ruff check to pass and ruff format to fail, got composite '$OUTCOME', ruff '$RUFF', format '$FORMAT'" >&2
+            exit 1
+          fi
+
   test-setup-python-cold:
     name: setup-python self-test (cold cache)
     needs: reset-self-test-caches

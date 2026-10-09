@@ -136,7 +136,8 @@ before committing, and in CI via `.github/workflows/ci.yml`'s self-test jobs (`t
 → `test-setup-bun-warm`, same pattern for `setup-nextjs-bun`, `setup-go`, `setup-python` and
 `setup-rust`) after. Each gate-bearing action also gets a deliberately-broken fixture proving the gate fires
 rather than silently no-op'ing — `go-app-broken` (an errcheck violation) and `python-app-broken`
-(an F401 unused import); both compile/import clean, so only the gate can catch them. A few things that are easy
+(an F401 unused import), `go-app-race` (a data race) and `python-app-unformatted` (lint-clean, not
+ruff-formatted); each compiles/imports and passes without its gate, so only the gate can catch it. A few things that are easy
 to get wrong when writing that kind of test:
 
 - **`actions/cache` saves in the job's *post* phase, after every main step completes.**
