@@ -796,6 +796,15 @@ jobs:
             echo "::error::expected no exact cache-hit on cold run, got 'true'" >&2
             exit 1
           fi
+      - name: assert the documented version outputs are populated
+        env:
+          UV_VERSION: ${{ steps.setup.outputs.uv-version }}
+          PYTHON_VERSION: ${{ steps.setup.outputs.python-version }}
+        run: |
+          if [ -z "$UV_VERSION" ] || [ -z "$PYTHON_VERSION" ]; then
+            echo "::error::setup-python outputs are blank: uv-version '$UV_VERSION', python-version '$PYTHON_VERSION'" >&2
+            exit 1
+          fi
 
   test-setup-python-warm:
     name: setup-python self-test (warm cache)
