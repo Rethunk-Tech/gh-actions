@@ -1,0 +1,11 @@
+# CI's audit-bun job runs this unit test from the repo root; detection finds no package.json there to read it from.
+[gates.audit-bun]
+run = "bun test audit-bun"
+
+# CI asserts the shared actions fail on these two fixtures, so they are broken on purpose; a failure
+# here is the fixture working, not a regression.
+[gates.".github/test-fixtures/python-app-broken"]
+allow-failure = true
+
+[gates.".github/test-fixtures/python-app-unformatted"]
+allow-failure = true

@@ -230,3 +230,5 @@ one command for `go-app`, so the Go steps share one compile). The CI jobs that e
 actions themselves need a GitHub runner and are not reproducible locally. Warm: 1.2 to 2.2 s wall,
 5 CPU-s. Cold (fresh `GOCACHE`, `XDG_CACHE_HOME` and golangci-lint cache): 4.8 s wall, 28 CPU-s, the
 `go-app` chain being the slowest step. No oversubscription and no duplicated steps.
+
+`.gate.toml` adds the `audit-bun` unit test CI runs from the repository root (`bun test audit-bun`), which gate's own CI-coverage warning reported missing. It also marks the two Python fixtures that are broken on purpose (`python-app-broken`, `python-app-unformatted`) `allow-failure`, because gate now gates every directory CI names and those two fail by design. Warm with v0.6.5: 1.1 s wall, 4.7 CPU-s.
