@@ -38,7 +38,7 @@ defaulting to preserving variance.
 
 ## Status
 
-**Shipped:** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`, `setup-rust`.
+**Shipped:** `setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python`, `setup-rust`, `audit-bun`.
 
 `setup-rust` has one caller (`Rethunk-Tech/heft`, 6 setup sites) and
 was built anyway. heft's `Swatinem/rust-cache` and `dtolnay/rust-toolchain` are not

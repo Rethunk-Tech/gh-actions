@@ -234,6 +234,19 @@ A `toolchain` input becomes the rustup default, but a `rust-toolchain.toml` stil
 its own directory. To check an older toolchain in such a repo, name it on the command:
 `cargo +1.98 check`.
 
+### `audit-bun`
+
+`bun audit --json` as a job gate that fails only when a fix exists: an advisory whose vulnerable
+range excludes the package's latest published version. One with no patched release prints a
+`::warning::` carrying its `bun why` chain and does not fail the job. Needs Bun on PATH.
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
+- uses: Rethunk-Tech/gh-actions/audit-bun@v1.14
+  with:
+    # working-directory: .              # where package.json and bun.lock live
+```
+
 ### Coming later
 
 `upload-pages` is designed but not yet built — see [AGENTS.md](AGENTS.md)

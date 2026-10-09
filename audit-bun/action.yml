@@ -1,0 +1,20 @@
+name: Audit Bun dependencies
+description: >
+  Run `bun audit --json` and fail only on advisories whose fix has shipped: the package's latest
+  published version lies outside the advisory's vulnerable range. An advisory with no patched
+  release prints as a warning with its `bun why` dependency chain and does not fail the job.
+  Needs Bun on PATH (setup-bun) and a prior install is not required.
+
+inputs:
+  working-directory:
+    description: Directory containing package.json and bun.lock.
+    required: false
+    default: "."
+
+runs:
+  using: composite
+  steps:
+    - name: bun audit
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: bun "$GITHUB_ACTION_PATH/audit.ts"

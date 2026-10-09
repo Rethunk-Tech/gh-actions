@@ -546,6 +546,37 @@ jobs:
           rustup target list --installed --toolchain stable | grep -qx x86_64-unknown-linux-musl
           cargo +stable check --locked --target x86_64-unknown-linux-musl
 
+  # audit-bun fails only on an advisory with a shipped fix. The pure split (fixable vs no patched
+  # release) is unit-tested; the fixture proves the gate fires on a real, fixable advisory
+  # (lodash 4.17.20) and stays quiet on a clean tree.
+  test-audit-bun:
+    name: audit-bun self-test (unit tests, fixable fails, clean passes)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app-vulnerable
+      - run: bun test audit-bun
+      - id: fixable
+        uses: ./audit-bun
+        continue-on-error: true
+        with:
+          working-directory: .github/test-fixtures/bun-app-vulnerable
+      - name: assert the fixable advisory failed the audit
+        env:
+          OUTCOME: ${{ steps.fixable.outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::audit-bun outcome was '$OUTCOME' on a fixable advisory, expected failure" >&2
+            exit 1
+          fi
+      - uses: ./audit-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app
+
   test-setup-bun-playwright-cold:
     name: setup-bun self-test (Playwright cache, cold)
     needs: reset-self-test-caches

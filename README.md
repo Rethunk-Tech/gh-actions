@@ -42,6 +42,8 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
 - `setup-python` wraps `astral-sh/setup-uv` with the cache forced on (upstream's `auto` default
   silently disables it on exactly the release and tag-push events where a cold install costs
   most), plus the same opt-in gate shape for ruff and `uv audit`.
+- `audit-bun` runs `bun audit --json` and fails only on advisories with a shipped fix; the rest warn
+  with their `bun why` chain.
 - `install-playwright` (`setup-bun`/`setup-nextjs-bun`) caches browsers by the resolved
   `@playwright/test` version, matching Playwright's own documented CI caching guide.
 - `extra-cache-paths` (`setup-bun`) caches a build directory the repo owns alongside the
