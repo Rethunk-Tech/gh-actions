@@ -220,3 +220,13 @@ than Linux/macOS, and this repo's own `bun-version-file` fallback (reading a ver
 implements. A bare `curl | bash` alternative would also be a supply-chain *regression*: a
 SHA-pinned action reference is an immutable, auditable artifact; a curl-piped install script
 from a live URL has no equivalent pin.
+
+## Gate budget
+
+Measured at load average 27 to 30 on 32 cores, so judge on CPU. `gate` runs actionlint over the
+workflows and, for each of the eight test fixtures under `.github/test-fixtures/` that CI builds, the
+fixture's own checks (biome for the JS ones; build, golangci-lint, test and govulncheck chained in
+one command for `go-app`, so the Go steps share one compile). The CI jobs that exercise the composite
+actions themselves need a GitHub runner and are not reproducible locally. Warm: 1.2 to 2.2 s wall,
+5 CPU-s. Cold (fresh `GOCACHE`, `XDG_CACHE_HOME` and golangci-lint cache): 4.8 s wall, 28 CPU-s, the
+`go-app` chain being the slowest step. No oversubscription and no duplicated steps.
