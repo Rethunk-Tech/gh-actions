@@ -18,7 +18,7 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.13
   with:
     working-directory: frontend        # default: .
     # bun-version: "1.4.0"            # default: resolved from package.json's packageManager
@@ -46,7 +46,7 @@ leaving the restore fragment empty restores from any previous extra cache for th
 is what a SHA-keyed cache wants because its key never repeats:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.13
   with:
     extra-cache-paths: .turbo
     extra-cache-key: ${{ github.sha }}
@@ -58,7 +58,7 @@ to put a `bun` binary on PATH), or one that must run `bun install` itself later 
 setup steps that have to happen first (e.g. cloning sibling repos for Bun `link:` resolution):
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.13
   with:
     skip-install: "true"     # only installs the bun binary; no lockfile check, no bun install.
                              # The install-store cache still runs whenever a bun.lock is
@@ -72,7 +72,7 @@ One Next.js app per call — for a repo with multiple Next apps, call this once 
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.13
   with:
     working-directory: frontend
     # same optional inputs as setup-bun: bun-version, node-version, install-playwright,
@@ -85,7 +85,7 @@ Next app itself lives in a subdirectory (`.next/`, source files to hash for the 
 key) — set `next-app-directory` separately from `working-directory`:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.13
   with:
     working-directory: .                     # workspace root — bun install runs here
     next-app-directory: apps/dashboard        # the actual Next app — .next/cache lives here
@@ -104,7 +104,7 @@ off by default.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.13
   with:
     go-version-file: go.mod          # default; may point into a subdir, e.g. backend/go.mod
     # go-version: "1.26.5"           # exact version instead — overrides go-version-file
@@ -124,7 +124,7 @@ It runs `go test -race ./...` from the directory named by `go-version-file` (or 
 `"false"` so existing setup-only and lint/vuln-only callers do not start running tests.
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.13
   with:
     run-test-race: "true"
     go-version-file: backend/go.mod
@@ -135,7 +135,7 @@ already names (no separate `working-directory` input needed), each `continue-on-
 a final gate step, so enabling both still surfaces both findings even if one fails:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.13
   with:
     run-lint: "true"                 # Linux and macOS runners; binary checksum-verified per run
     # run-test-race: "false"         # default; keep this a lint/vuln-only job
@@ -159,7 +159,7 @@ by default.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-python@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-python@v1.13
   with:
     # python-version: "3.14"          # default: resolved from .python-version / requires-python
     # uv-version: "0.11.28"           # default: from pyproject.toml/uv.toml, else latest
@@ -182,7 +182,7 @@ needs ruff present in the synced environment, which for most repos means adding 
 than one still surfaces every finding even if an earlier one fails:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-python@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-python@v1.13
   with:
     install-args: --locked --group dev
     run-ruff: "true"
@@ -203,7 +203,7 @@ than one still surfaces every finding even if an earlier one fails:
 and `uvx` on PATH for a standalone tool:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-python@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-python@v1.13
   with:
     skip-install: "true"     # only installs uv and the interpreter; no uv sync. The cache is
                              # still restored and saved.
@@ -216,7 +216,7 @@ cache keyed per job.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-rust@v1.11
+- uses: Rethunk-Tech/gh-actions/setup-rust@v1.13
   with:
     # toolchain: "1.98"                  # default: rust-toolchain.toml, else stable
     # components: rustfmt, clippy        # comma- or space-separated
@@ -244,7 +244,7 @@ for status.
 Point-release tags (`v1.11`, `v1.12`, …) are immutable. The floating major `v1` is moved by
 `.github/workflows/release.yml` to the newest `v1.N` when that tag is the latest in the major.
 
-Convenience examples here use the current point-release (`@v1.11`). Fleet call sites pin by
+Convenience examples here use the current point-release (`@v1.13`). Fleet call sites pin by
 commit SHA with a version comment, matching how these actions pin their own dependencies:
 
 ```yaml
@@ -258,7 +258,7 @@ not a stale pin: `setup-rust` is not on `v1.10`, so `setup-rust@v1.10` fails wit
 
 The repo-ops actions-refresh-sha sweep ([Rethunk-Tech/repo-ops](https://github.com/Rethunk-Tech/repo-ops))
 keeps an existing **SHA** pin current within a major automatically; it has nothing to act on for a
-bare version-tag reference like `@v1.11` (there is no stale SHA in that reference for the sweep to
+bare version-tag reference like `@v1.13` (there is no stale SHA in that reference for the sweep to
 find). Crossing a major (`v1` → `v2`) needs actions-refresh-sha with the latest option, and
 only ever applies to SHA pins either way.
 
