@@ -2,10 +2,6 @@
 [gates.audit-bun]
 run = "bun test audit-bun"
 
-# CI asserts the shared actions fail on these two fixtures, so they are broken on purpose; a failure
-# here is the fixture working, not a regression.
-[gates.".github/test-fixtures/python-app-broken"]
-allow-failure = true
-
-[gates.".github/test-fixtures/python-app-unformatted"]
-allow-failure = true
+# CI asserts the shared actions fail on these two fixtures, so they are broken on purpose and gate leaves them out.
+[detect]
+exclude = ["python-app-broken", "python-app-unformatted"]
