@@ -103,8 +103,8 @@ jobs:
           # already unambiguous, so no --ref is needed on the delete call itself.
           prefixes='Linux-bun- Linux-nextjs- setup-go-Linux- setup-go-lint- setup-rust- playwright-Linux- Linux-bun-extra- setup-uv-'
 
-          # A single transient 5xx from the cache API used to abort this step, leaving the
-          # caches warm so every cold-cache assertion downstream failed for the wrong reason.
+          # A single transient 5xx from the cache API must not abort this step: warm caches would
+          # make every cold-cache assertion downstream fail for the wrong reason.
           # Retry each delete, then verify emptiness: a cache that genuinely survives still
           # fails the job, which is what keeps the cold assertions meaningful.
           for attempt in 1 2 3; do
@@ -395,8 +395,8 @@ jobs:
           fi
 
   # Distinct Playwright version (1.55.1) so playwright-${{ runner.os }}-${version} keys do not
-  # collide with setup-bun's 1.63.0 fixture. Those two used to share 1.63.0, so a parallel
-  # cold pair raced one cache key.
+  # collide with setup-bun's 1.63.0 fixture: sharing one version would make a parallel
+  # cold pair race one cache key.
   test-setup-nextjs-bun-playwright-cold:
     name: setup-nextjs-bun self-test (Playwright cache, cold)
     needs: reset-self-test-caches
