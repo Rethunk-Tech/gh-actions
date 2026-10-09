@@ -88,6 +88,15 @@ outputs:
   cache-hit:
     description: Whether the uv dependency cache was hit.
     value: ${{ steps.setup-uv.outputs.cache-hit }}
+  ruff-outcome:
+    description: Outcome of the `ruff check` gate (success, failure or skipped when run-ruff is off).
+    value: ${{ steps.ruff.outcome }}
+  ruff-format-outcome:
+    description: Outcome of the `ruff format --check` gate (success, failure or skipped when run-ruff-format is off).
+    value: ${{ steps.ruff-format.outcome }}
+  audit-outcome:
+    description: Outcome of the `uv audit` gate (success, failure or skipped when run-audit is off).
+    value: ${{ steps.audit.outcome }}
 
 runs:
   using: composite

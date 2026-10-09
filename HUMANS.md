@@ -111,7 +111,7 @@ off by default.
     # cache-dependency-path: "**/go.sum"  # default: the go.sum next to go-version-file, plus go-version-file
 ```
 
-Outputs: `go-version`, `cache-hit` (an exact key match for this job).
+Outputs: `go-version`, `cache-hit` (an exact key match for this job), and `test-race-outcome`, `lint-outcome`, `govulncheck-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
 
 The cache key is Go version + dependency hash + job id, so a job with `run-test-race` enabled and
 a lint-only job each restore the build cache they filled themselves — a lint job's cache is never
@@ -167,7 +167,7 @@ by default.
     # install-args: --locked --group dev   # default: --locked (REPLACES, does not append)
 ```
 
-Outputs: `uv-version`, `python-version`, `cache-hit`.
+Outputs: `uv-version`, `python-version`, `cache-hit`, and `ruff-outcome`, `ruff-format-outcome`, `audit-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off).
 
 `python-version` selects the interpreter by exporting `UV_PYTHON`; it does not install one
 itself. uv downloads a managed interpreter when `uv sync`/`uv run` needs it, so this is

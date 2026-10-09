@@ -74,6 +74,15 @@ outputs:
   cache-hit:
     description: Whether the module/build cache was restored from an exact key match for this job.
     value: ${{ steps.go-cache.outputs.cache-hit }}
+  test-race-outcome:
+    description: Outcome of the `go test -race` gate (success, failure or skipped when run-test-race is off).
+    value: ${{ steps.test-race.outcome }}
+  lint-outcome:
+    description: Outcome of the golangci-lint gate (success, failure or skipped when run-lint is off).
+    value: ${{ steps.lint.outcome }}
+  govulncheck-outcome:
+    description: Outcome of the govulncheck gate (success, failure or skipped when run-govulncheck is off).
+    value: ${{ steps.govulncheck.outcome }}
 
 runs:
   using: composite

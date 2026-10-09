@@ -707,12 +707,18 @@ jobs:
           go-version-file: .github/test-fixtures/go-app-broken/go.mod
           run-lint: "true"
           run-govulncheck: "true"
-      - name: assert the lint step actually failed
+      - name: assert the lint step failed and govulncheck still ran
         env:
           OUTCOME: ${{ steps.setup.outcome }}
+          LINT: ${{ steps.setup.outputs.lint-outcome }}
+          VULN: ${{ steps.setup.outputs.govulncheck-outcome }}
         run: |
-          if [ "$OUTCOME" != "failure" ]; then
-            echo "::error::expected the lint gate to fail on a known-bad fixture, got outcome '$OUTCOME'" >&2
+          if [ "$OUTCOME" != "failure" ] || [ "$LINT" != "failure" ]; then
+            echo "::error::expected the lint gate to fail on a known-bad fixture, got composite '$OUTCOME', lint '$LINT'" >&2
+            exit 1
+          fi
+          if [ "$VULN" != "success" ] && [ "$VULN" != "failure" ]; then
+            echo "::error::govulncheck did not run after lint failed (outcome '$VULN')" >&2
             exit 1
           fi
 
@@ -797,12 +803,18 @@ jobs:
           install-args: --locked --group dev
           run-ruff: "true"
           run-audit: "true"
-      - name: assert the ruff step actually failed
+      - name: assert the ruff step failed and uv audit still ran
         env:
           OUTCOME: ${{ steps.setup.outcome }}
+          RUFF: ${{ steps.setup.outputs.ruff-outcome }}
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
         run: |
-          if [ "$OUTCOME" != "failure" ]; then
-            echo "::error::expected the ruff gate to fail on a known-bad fixture, got outcome '$OUTCOME'" >&2
+          if [ "$OUTCOME" != "failure" ] || [ "$RUFF" != "failure" ]; then
+            echo "::error::expected the ruff gate to fail on a known-bad fixture, got composite '$OUTCOME', ruff '$RUFF'" >&2
+            exit 1
+          fi
+          if [ "$AUDIT" != "success" ] && [ "$AUDIT" != "failure" ]; then
+            echo "::error::uv audit did not run after ruff failed (outcome '$AUDIT')" >&2
             exit 1
           fi
 
