@@ -115,6 +115,7 @@ runs:
         node-version: ${{ inputs.node-version }}
 
     - name: Setup Bun
+      id: setup-bun
       uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
         bun-version: ${{ inputs.bun-version }}
@@ -145,13 +146,15 @@ runs:
     # saving it again keeps every stale version. Rethunk-Tech/Website's store had grown to 870MB
     # compressed (21s restore, 20s save per job); a fresh store for the same lockfile measured
     # 263MB. A lockfile change now costs one network install instead.
+    # The installed Bun version (what `bun --version` prints) sits ahead of the lockfile hash
+    # so two jobs with the same bun.lock and different Bun versions do not share a store.
     - name: Cache Bun install store
       id: bun-cache
       if: steps.lockfile.outputs.present == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.bun/install/cache
-        key: ${{ runner.os }}-bun-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}
+        key: ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-version }}-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}
 
     - name: Cache extra paths
       if: inputs.extra-cache-paths != '' && inputs.extra-cache-key != ''
