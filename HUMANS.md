@@ -99,8 +99,8 @@ outputs as `setup-bun` when `install-playwright` is on.
 ### `setup-go`
 
 Go toolchain via `actions/setup-go`, plus a module/build cache keyed per job. Optionally also
-runs `go test -race ./...`, golangci-lint, and/or govulncheck as gates on the same job — opt-in,
-off by default.
+runs `go test -race ./...`, golangci-lint, `golangci-lint fmt --diff`, and/or govulncheck as
+gates on the same job — opt-in, off by default.
 
 ```yaml
 - uses: actions/checkout@v7
@@ -111,7 +111,7 @@ off by default.
     # cache-dependency-path: "**/go.sum"  # default: the go.sum next to go-version-file, plus go-version-file
 ```
 
-Outputs: `go-version`, `cache-hit` (an exact key match for this job), and `test-race-outcome`, `lint-outcome`, `govulncheck-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
+Outputs: `go-version`, `cache-hit` (an exact key match for this job), and `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
 
 The cache key is Go version + dependency hash + job id, so a job with `run-test-race` enabled and
 a lint-only job each restore the build cache they filled themselves — a lint job's cache is never
@@ -130,9 +130,9 @@ It runs `go test -race ./...` from the directory named by `go-version-file` (or 
     go-version-file: backend/go.mod
 ```
 
-**Lint + vuln gate** — both run from the same directory `go-version-file`/`cache-dependency-path`
+**Lint, format, and vuln gates** — each runs from the same directory `go-version-file`/`cache-dependency-path`
 already names (no separate `working-directory` input needed), each `continue-on-error` behind
-a final gate step, so enabling both still surfaces both findings even if one fails:
+a final gate step, so enabling more than one still surfaces every finding even if one fails:
 
 ```yaml
 - uses: Rethunk-Tech/gh-actions/setup-go@v1.14
@@ -140,7 +140,10 @@ a final gate step, so enabling both still surfaces both findings even if one fai
     run-lint: "true"                 # Linux and macOS runners; binary checksum-verified per run
     # run-test-race: "false"         # default; keep this a lint/vuln-only job
     # lint-version: v2.14.0          # default: built with go1.27, matching the fleet's modules
-    # lint-args: --timeout 5m
+    # lint-args: --timeout 5m        # extra flags for `golangci-lint run` only
+    run-fmt: "true"                  # separate input: `golangci-lint run` does not run formatters,
+                                     # and one input for both would fail every repo that has only
+                                     # ever run `golangci-lint run`
     run-govulncheck: "true"
     # govulncheck-version: v1.8.0    # default: fleet-latest as of this writing
     # govulncheck-args: -tags=foo
@@ -149,7 +152,7 @@ a final gate step, so enabling both still surfaces both findings even if one fai
 Doesn't fit every caller — a custom JSON-output/non-fatal gating script, or a job-level
 CGO_ENABLED/PKG_CONFIG_PATH build-tag requirement (job-level `env:` reaches these steps
 fine; it's the invocation shape itself, e.g. raw `-json` output, that doesn't map to an input)
-— those callers just leave `run-lint`/`run-govulncheck` off and keep their own step.
+— those callers just leave `run-lint`/`run-fmt`/`run-govulncheck` off and keep their own step.
 
 ### `setup-python`
 

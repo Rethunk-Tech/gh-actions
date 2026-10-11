@@ -769,7 +769,7 @@ jobs:
           fi
 
   test-setup-go-lint-vuln-pass:
-    name: setup-go self-test (lint + govulncheck, clean fixture)
+    name: setup-go self-test (lint + fmt + govulncheck, clean fixture)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -779,6 +779,7 @@ jobs:
         with:
           go-version-file: .github/test-fixtures/go-app/go.mod
           run-lint: "true"
+          run-fmt: "true"
           run-govulncheck: "true"
 
   # Proves two things: the lint gate actually fires rather than silently no-op'ing — a fixture
@@ -839,6 +840,32 @@ jobs:
         run: |
           if [ "$OUTCOME" != "failure" ] || [ "$RACE" != "failure" ]; then
             echo "::error::expected the race gate to fail on a racy fixture, got composite '$OUTCOME', race '$RACE'" >&2
+            exit 1
+          fi
+
+  # Proves the run-fmt gate fires: a fixture that is golangci-lint run clean but not formatted.
+  test-setup-go-fmt-catches-unformatted:
+    name: setup-go self-test (fmt gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-app-unformatted/go.mod
+          run-lint: "true"
+          run-fmt: "true"
+      - name: assert only the format gate failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          LINT: ${{ steps.setup.outputs.lint-outcome }}
+          FMT: ${{ steps.setup.outputs.fmt-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$FMT" != "failure" ] || [ "$LINT" != "success" ]; then
+            echo "::error::expected golangci-lint run to pass and fmt to fail, got composite '$OUTCOME', lint '$LINT', fmt '$FMT'" >&2
             exit 1
           fi
 

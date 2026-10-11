@@ -1,8 +1,9 @@
 name: Setup Go
 description: >
   Install a Go toolchain via actions/setup-go and cache its module and build caches per job.
-  Optionally also run the race-enabled test suite, golangci-lint, and/or govulncheck as gates on
-  the same job — opt-in, off by default. Writes a pass/fail table to the job's step summary.
+  Optionally also run the race-enabled test suite, golangci-lint, golangci-lint fmt, and/or
+  govulncheck as gates on the same job — opt-in, off by default. Writes a pass/fail table to the
+  job's step summary.
 
 inputs:
   go-version:
@@ -15,7 +16,7 @@ inputs:
     description: >
       Path to the go.mod (or go.work) file to resolve the Go version from. Only used when
       go-version is empty. May point into a subdirectory (e.g. "backend/go.mod") when the
-      module isn't at the checkout root — the test/lint/govulncheck steps below run from that
+      module isn't at the checkout root — the test/lint/fmt/govulncheck steps below run from that
       same subdirectory automatically, with no separate working-directory input: every real
       fleet case that needs one needs the exact directory go-version-file already names.
     required: false
@@ -34,9 +35,17 @@ inputs:
     default: "false"
   run-lint:
     description: >
-      When true, downloads golangci-lint (checksum-verified against its release) and runs it
-      after the toolchain is set up. Turns this action into a job gate for callers who opt in —
+      When true, downloads golangci-lint (checksum-verified against its release) and runs
+      `golangci-lint run` after the toolchain is set up. Turns this action into a job gate for callers who opt in —
       off by default. Linux and macOS runners only.
+    required: false
+    default: "false"
+  run-fmt:
+    description: >
+      When true, runs `golangci-lint fmt --diff` after the toolchain is set up. Separate from
+      run-lint because `golangci-lint run` does not run formatters, and enabling both from one
+      input would fail every repo that has only ever run `golangci-lint run`. Off by default.
+      Uses the same checksum-verified binary as run-lint. Linux and macOS runners only.
     required: false
     default: "false"
   lint-version:
@@ -80,6 +89,9 @@ outputs:
   lint-outcome:
     description: Outcome of the golangci-lint gate (success, failure or skipped when run-lint is off).
     value: ${{ steps.lint.outcome }}
+  fmt-outcome:
+    description: Outcome of the `golangci-lint fmt --diff` gate (success, failure or skipped when run-fmt is off).
+    value: ${{ steps.fmt.outcome }}
   govulncheck-outcome:
     description: Outcome of the govulncheck gate (success, failure or skipped when run-govulncheck is off).
     value: ${{ steps.govulncheck.outcome }}
@@ -111,7 +123,7 @@ runs:
       env:
         GO_VERSION_FILE: ${{ inputs.go-version-file }}
         CACHE_DEPENDENCY_PATH: ${{ inputs.cache-dependency-path }}
-        NEEDS_DIR: ${{ inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-govulncheck == 'true' }}
+        NEEDS_DIR: ${{ inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' }}
       run: |
         if [ -n "$CACHE_DEPENDENCY_PATH" ]; then
           path="$CACHE_DEPENDENCY_PATH"
@@ -130,7 +142,7 @@ runs:
         case "$path" in
           *$'\n'*|*'*'*)
             if [ "$NEEDS_DIR" = "true" ]; then
-              echo "::error::run-test-race/run-lint/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave the gate inputs off for this caller." >&2
+              echo "::error::run-test-race/run-lint/run-fmt/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave the gate inputs off for this caller." >&2
               exit 1
             fi
             ;;
@@ -183,7 +195,7 @@ runs:
     # inside this action, so restore and save are split and an exact hit skips the save.
     - name: Restore golangci-lint cache
       id: lint-cache
-      if: inputs.run-lint == 'true'
+      if: inputs.run-lint == 'true' || inputs.run-fmt == 'true'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/setup-go-golangci-lint
@@ -195,7 +207,7 @@ runs:
     # failure, and must not be reported by the gate below as lint findings.
     - name: Install golangci-lint
       id: lint-install
-      if: inputs.run-lint == 'true'
+      if: inputs.run-lint == 'true' || inputs.run-fmt == 'true'
       shell: bash
       env:
         LINT_VERSION: ${{ inputs.lint-version }}
@@ -206,12 +218,12 @@ runs:
         case "$OS_NAME" in
           Linux) os=linux ;;
           macOS) os=darwin ;;
-          *) echo "::error::run-lint supports Linux and macOS runners, not $OS_NAME" >&2; exit 1 ;;
+          *) echo "::error::run-lint/run-fmt supports Linux and macOS runners, not $OS_NAME" >&2; exit 1 ;;
         esac
         case "$ARCH_NAME" in
           X64) arch=amd64 ;;
           ARM64) arch=arm64 ;;
-          *) echo "::error::run-lint has no golangci-lint release for runner arch $ARCH_NAME" >&2; exit 1 ;;
+          *) echo "::error::run-lint/run-fmt has no golangci-lint release for runner arch $ARCH_NAME" >&2; exit 1 ;;
         esac
         version="${LINT_VERSION#v}"
         base="golangci-lint-$version-$os-$arch"
@@ -265,8 +277,24 @@ runs:
           "$GOLANGCI_LINT" run
         fi
 
+    - name: golangci-lint fmt
+      id: fmt
+      if: inputs.run-fmt == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ steps.moddir.outputs.dir }}
+      env:
+        GOLANGCI_LINT: ${{ steps.lint-install.outputs.bin }}
+      run: |
+        export GOLANGCI_LINT_CACHE="$HOME/.cache/setup-go-golangci-lint"
+        # Same config check as `golangci-lint run`: a key the schema rejects is otherwise ignored.
+        if "$GOLANGCI_LINT" config path >/dev/null 2>&1; then
+          "$GOLANGCI_LINT" config verify
+        fi
+        "$GOLANGCI_LINT" fmt --diff
+
     - name: Save golangci-lint cache
-      if: inputs.run-lint == 'true' && steps.lint-cache.outputs.cache-hit != 'true'
+      if: (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && steps.lint-cache.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/setup-go-golangci-lint
@@ -296,15 +324,17 @@ runs:
     # own vuln-gate.sh auto-files GitHub issues per CVE) this generic fleet action has no
     # business opinionating about. A caller that wants that keeps its own downstream step
     # reading govulncheck's `-json` output directly instead of enabling run-govulncheck here.
-    - name: Gate on test/lint/govulncheck results
-      if: inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-govulncheck == 'true'
+    - name: Gate on test/lint/fmt/govulncheck results
+      if: inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true'
       shell: bash
       env:
         RUN_TEST_RACE: ${{ inputs.run-test-race }}
         RUN_LINT: ${{ inputs.run-lint }}
+        RUN_FMT: ${{ inputs.run-fmt }}
         RUN_VULN: ${{ inputs.run-govulncheck }}
         TEST_RACE_OUTCOME: ${{ steps.test-race.outcome }}
         LINT_OUTCOME: ${{ steps.lint.outcome }}
+        FMT_OUTCOME: ${{ steps.fmt.outcome }}
         VULN_OUTCOME: ${{ steps.govulncheck.outcome }}
       run: |
         row() {
@@ -318,12 +348,13 @@ runs:
           fi
         }
         {
-          echo "## setup-go test/lint/vuln gate"
+          echo "## setup-go test/lint/fmt/vuln gate"
           echo "| Check | Result |"
           echo "| --- | --- |"
         } >> "$GITHUB_STEP_SUMMARY"
         row "$RUN_TEST_RACE" "$TEST_RACE_OUTCOME" "go test -race"
         row "$RUN_LINT" "$LINT_OUTCOME" "golangci-lint"
+        row "$RUN_FMT" "$FMT_OUTCOME" "golangci-lint fmt --diff"
         row "$RUN_VULN" "$VULN_OUTCOME" "govulncheck"
 
         failed=0
@@ -333,6 +364,10 @@ runs:
         fi
         if [ "$LINT_OUTCOME" = "failure" ]; then
           echo "::error::golangci-lint found issues — see the golangci-lint step above" >&2
+          failed=1
+        fi
+        if [ "$FMT_OUTCOME" = "failure" ]; then
+          echo "::error::golangci-lint fmt --diff found unformatted files — see the golangci-lint fmt step above" >&2
           failed=1
         fi
         if [ "$VULN_OUTCOME" = "failure" ]; then
