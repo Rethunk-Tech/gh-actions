@@ -198,9 +198,10 @@ local has no public answer yet. Given that ambiguity, `setup-nextjs-bun` duplica
 
 Two consequences that matter if you touch either action:
 
-1. **They will drift** if one changes without the other — an accepted, documented cost, not
-   an oversight. Check both when changing shared behavior (Bun setup, the install-store cache,
-   the Playwright branch).
+1. **Shared steps are checked.** `scripts/check-setup-bun-drift.py` fails the lint job and
+   the `setup-bun-drift` gate when Bun version resolution, the install-store cache, or the
+   Playwright branch diverges. A difference that stays is an exception in that script, reviewed
+   with the change. The steps stay duplicated; the actions are not composed.
 2. `setup-nextjs-bun`'s own `.next/cache` step resolves its path via `$GITHUB_ENV` in the
    guard step rather than an inline `inputs.working-directory` expression — this keeps it safe
    at nesting depth 1, but **a consumer that wraps this action inside their own local
@@ -231,4 +232,4 @@ actions themselves need a GitHub runner and are not reproducible locally. Warm: 
 5 CPU-s. Cold (fresh `GOCACHE`, `XDG_CACHE_HOME` and golangci-lint cache): 4.8 s wall, 28 CPU-s, the
 `go-app` chain being the slowest step. No oversubscription and no duplicated steps.
 
-`.gate.toml` adds the `audit-bun` unit test CI runs from the repository root (`bun test audit-bun`), which gate's own CI-coverage warning reported missing. It also lists the two Python fixtures that are broken on purpose (`python-app-broken`, `python-app-unformatted`) under `[detect] exclude`, because gate gates every directory CI names and those two fail by design. Warm with v0.6.5: 1.1 s wall, 4.7 CPU-s.
+`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing) and `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`). It also lists the two Python fixtures that are broken on purpose (`python-app-broken`, `python-app-unformatted`) under `[detect] exclude`, because gate gates every directory CI names and those two fail by design. Warm with v0.6.5: 1.1 s wall, 4.7 CPU-s.

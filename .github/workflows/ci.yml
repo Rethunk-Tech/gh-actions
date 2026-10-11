@@ -56,6 +56,11 @@ jobs:
           sys.exit(1 if bad else 0)
           EOF
 
+      # setup-nextjs-bun duplicates setup-bun's shared steps instead of composing them
+      # (actions/runner#2009). Fail when those steps diverge without an exception in the script.
+      - name: Check setup-bun and setup-nextjs-bun shared steps
+        run: python3 scripts/check-setup-bun-drift.py
+
       # A fixture directory silently excluded by .gitignore never reaches CI's checkout, so the
       # self-test that uses it fails at "action can't find its fixture" while its outcome
       # assertion still reads as the gate firing. That shipped once: `**/*-broken` matched the
