@@ -2,7 +2,8 @@ name: Setup Rust
 description: >
   Install a Rust toolchain with the runner's preinstalled rustup — from rust-toolchain.toml or an
   explicit channel — plus components and targets, and cache the cargo registry, git
-  dependencies and target/ per job.
+  dependencies and target/ per job. Optionally run cargo clippy as a gate on the same job —
+  opt-in, off by default.
 
 inputs:
   toolchain:
@@ -26,11 +27,21 @@ inputs:
     description: Directory containing Cargo.lock and any rust-toolchain.toml.
     required: false
     default: "."
+  run-clippy:
+    description: >
+      When true, installs clippy if it is not already on the toolchain and runs
+      `cargo clippy --locked --all-targets -- -D warnings` from working-directory.
+      Turns this action into a job gate for callers who opt in — off by default.
+    required: false
+    default: "false"
 
 outputs:
   cache-hit:
     description: Whether the cargo cache was restored from an exact key match for this job.
     value: ${{ steps.cargo-cache.outputs.cache-hit }}
+  clippy-outcome:
+    description: Outcome of the cargo clippy gate (success, failure, or skipped when run-clippy is off).
+    value: ${{ steps.clippy.outcome }}
 
 runs:
   using: composite
@@ -45,6 +56,7 @@ runs:
         TOOLCHAIN: ${{ inputs.toolchain }}
         COMPONENTS: ${{ inputs.components }}
         TARGETS: ${{ inputs.targets }}
+        RUN_CLIPPY: ${{ inputs.run-clippy }}
       run: |
         want_components=$(printf '%s' "$COMPONENTS" | tr ' ' ',' | tr -s ',' | sed 's/^,//;s/,$//')
         want_targets=$(printf '%s' "$TARGETS" | tr ' ' ',' | tr -s ',' | sed 's/^,//;s/,$//')
@@ -68,6 +80,17 @@ runs:
         if [ -n "$want_targets" ]; then
           IFS=, read -ra list <<< "$want_targets"
           rustup target add "${extra[@]}" "${list[@]}"
+        fi
+        if [ "$RUN_CLIPPY" = "true" ]; then
+          # `component add` with no --toolchain installs onto the rustup default. The
+          # toolchain-file branch leaves extra empty, and cargo inside working-directory
+          # uses that file's toolchain, which is not necessarily the default.
+          if [ ${#extra[@]} -eq 0 ]; then
+            clippy_tc=(--toolchain "$(rustup show active-toolchain | cut -d' ' -f1)")
+          else
+            clippy_tc=("${extra[@]}")
+          fi
+          rustup component add "${clippy_tc[@]}" clippy
         fi
         "${rustc[@]}" -V
         fingerprint=$(printf '%s\n%s\n' "$("${rustc[@]}" -vV)" "$want_targets" | git hash-object --stdin)
@@ -101,3 +124,32 @@ runs:
         restore-keys: |
           setup-rust-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles(format('{0}/Cargo.lock', inputs.working-directory)) }}-
           setup-rust-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.fingerprint }}-
+
+    # continue-on-error so this step keeps its own warning icon and the gate below is
+    # what fails the job, matching setup-go. The summary is a pass/fail row, not a
+    # parsed clippy report.
+    - name: cargo clippy
+      id: clippy
+      if: inputs.run-clippy == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: cargo clippy --locked --all-targets -- -D warnings
+
+    - name: Gate on clippy result
+      if: inputs.run-clippy == 'true'
+      shell: bash
+      env:
+        CLIPPY_OUTCOME: ${{ steps.clippy.outcome }}
+      run: |
+        {
+          echo "## setup-rust clippy gate"
+          echo "| Check | Result |"
+          echo "| --- | --- |"
+        } >> "$GITHUB_STEP_SUMMARY"
+        if [ "$CLIPPY_OUTCOME" = "failure" ]; then
+          echo "| cargo clippy | ❌ fail |" >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::cargo clippy found issues — see the cargo clippy step above" >&2
+          exit 1
+        fi
+        echo "| cargo clippy | ✅ pass |" >> "$GITHUB_STEP_SUMMARY"

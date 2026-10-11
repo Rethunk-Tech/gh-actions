@@ -222,9 +222,23 @@ cache keyed per job.
     # components: rustfmt, clippy        # comma- or space-separated
     # targets: aarch64-unknown-linux-gnu
     # working-directory: .               # where Cargo.lock and rust-toolchain.toml live
+    # run-clippy: "true"                 # default false
 ```
 
-Output: `cache-hit` (an exact key match for this job).
+Outputs: `cache-hit` (an exact key match for this job) and `clippy-outcome` (`success`, `failure`, or `skipped` when `run-clippy` is off).
+
+**Clippy gate** — runs `cargo clippy --locked --all-targets -- -D warnings` from
+`working-directory`, with `continue-on-error` on that step and a final gate step, same shape as
+`setup-go`'s lint gate. Installs the clippy component when it is not already on the toolchain.
+Off by default, so a caller that does not set it does not start running clippy. A caller whose
+invocation differs keeps its own step and leaves `run-clippy` unset.
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-rust@v1.14
+  with:
+    run-clippy: "true"
+    # working-directory: .
+```
 
 The key is the compiler build (`rustc -vV`) + `targets` + `Cargo.lock` hash + job id, so matrix
 legs that differ by target, and jobs on different toolchains, never share a `target/`. Sets
