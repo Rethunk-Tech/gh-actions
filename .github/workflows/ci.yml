@@ -516,6 +516,7 @@ jobs:
         env:
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
           CLIPPY: ${{ steps.setup.outputs.clippy-outcome }}
+          FMT: ${{ steps.setup.outputs.fmt-outcome }}
           PHASE: ${{ matrix.phase }}
         working-directory: .github/test-fixtures/rust-app
         run: |
@@ -523,6 +524,10 @@ jobs:
           cargo build --locked
           if [ "$CLIPPY" != "skipped" ]; then
             echo "::error::expected clippy-outcome=skipped when run-clippy is off, got '$CLIPPY'" >&2
+            exit 1
+          fi
+          if [ "$FMT" != "skipped" ]; then
+            echo "::error::expected fmt-outcome=skipped when run-fmt is off, got '$FMT'" >&2
             exit 1
           fi
           if [ "$PHASE" = "cold" ] && [ "$CACHE_HIT" = "true" ]; then
@@ -553,6 +558,7 @@ jobs:
       - name: assert the components and target were installed
         env:
           CLIPPY: ${{ steps.setup.outputs.clippy-outcome }}
+          FMT: ${{ steps.setup.outputs.fmt-outcome }}
         working-directory: .github/test-fixtures/rust-app
         run: |
           cargo +stable fmt --check
@@ -562,9 +568,13 @@ jobs:
             echo "::error::expected clippy-outcome=skipped when run-clippy is off, got '$CLIPPY'" >&2
             exit 1
           fi
+          if [ "$FMT" != "skipped" ]; then
+            echo "::error::expected fmt-outcome=skipped when run-fmt is off, got '$FMT'" >&2
+            exit 1
+          fi
 
   test-setup-rust-clippy-pass:
-    name: setup-rust self-test (clippy gate, clean fixture)
+    name: setup-rust self-test (clippy + fmt gates, clean fixture)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -575,12 +585,14 @@ jobs:
         with:
           working-directory: .github/test-fixtures/rust-app
           run-clippy: "true"
-      - name: assert the clippy gate passed
+          run-fmt: "true"
+      - name: assert the clippy and fmt gates passed
         env:
           CLIPPY: ${{ steps.setup.outputs.clippy-outcome }}
+          FMT: ${{ steps.setup.outputs.fmt-outcome }}
         run: |
-          if [ "$CLIPPY" != "success" ]; then
-            echo "::error::expected clippy-outcome=success on the clean fixture, got '$CLIPPY'" >&2
+          if [ "$CLIPPY" != "success" ] || [ "$FMT" != "success" ]; then
+            echo "::error::expected clippy-outcome and fmt-outcome success on the clean fixture, got clippy '$CLIPPY', fmt '$FMT'" >&2
             exit 1
           fi
 
@@ -607,6 +619,32 @@ jobs:
         run: |
           if [ "$OUTCOME" != "failure" ] || [ "$CLIPPY" != "failure" ]; then
             echo "::error::expected the clippy gate to fail on a known-bad fixture, got composite '$OUTCOME', clippy '$CLIPPY'" >&2
+            exit 1
+          fi
+
+  # Proves the run-fmt gate fires: a fixture that is clippy-clean but not rustfmt-formatted.
+  test-setup-rust-fmt-catches-unformatted:
+    name: setup-rust self-test (fmt gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-rust
+        with:
+          working-directory: .github/test-fixtures/rust-app-unformatted
+          run-clippy: "true"
+          run-fmt: "true"
+      - name: assert only the format gate failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          CLIPPY: ${{ steps.setup.outputs.clippy-outcome }}
+          FMT: ${{ steps.setup.outputs.fmt-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$FMT" != "failure" ] || [ "$CLIPPY" != "success" ]; then
+            echo "::error::expected cargo clippy to pass and cargo fmt to fail, got composite '$OUTCOME', clippy '$CLIPPY', fmt '$FMT'" >&2
             exit 1
           fi
 
