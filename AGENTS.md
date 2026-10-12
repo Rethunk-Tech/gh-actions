@@ -77,12 +77,14 @@ different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `u
   deliberate test exception: its opt-in `run-test-race` always runs the canon command
   `go test -race ./...`. **Lint/security-gate steps are the other deliberate exception**
   (`setup-go`'s opt-in `run-lint`/`run-fmt`/`run-govulncheck`, `setup-python`'s
-  `run-ruff`/`run-ruff-format`/`run-audit`, and `setup-rust`'s `run-clippy`/`run-fmt`, all off by default):
+  `run-ruff`/`run-ruff-format`/`run-audit`, `setup-rust`'s `run-clippy`/`run-fmt`, and
+  `setup-bun`'s `run-audit`, all off by default):
   unlike build/test, every real fleet caller invokes the exact same tools for its language
   (`golangci-lint` and `govulncheck` for Go; `ruff` and `uv audit` for Python;
-  `cargo clippy --locked --all-targets -- -D warnings` and `cargo fmt --all -- --check` for Rust).
-  Go and Python vary only version/args — real passthrough inputs, not a project-defined verb — and Rust's commands
-  do not vary at all. Centralizing them converges the fleet onto one reviewed SHA pin instead of
+  `cargo clippy --locked --all-targets -- -D warnings` and `cargo fmt --all -- --check` for Rust;
+  `audit-bun/audit.ts` for Bun).
+  Go and Python vary only version/args — real passthrough inputs, not a project-defined verb — and Rust's and Bun's commands
+  do not vary at all. `setup-bun` calls `audit-bun/audit.ts` rather than keeping a second auditor. Centralizing them converges the fleet onto one reviewed SHA pin instead of
   per-repo pins. Each such gate runs
   with `continue-on-error: true` behind a final gate step (never plain fail-fast) so enabling
   more than one still surfaces every finding in one run. A caller whose exact invocation
@@ -138,8 +140,9 @@ before committing, and in CI via `.github/workflows/ci.yml`'s self-test jobs (`t
 `setup-rust`) after. Each gate-bearing action also gets a deliberately-broken fixture proving the gate fires
 rather than silently no-op'ing — `go-app-broken` (an errcheck violation) and `python-app-broken`
 (an F401 unused import), `go-app-race` (a data race), `go-app-unformatted` (lint-clean, not gofmt-formatted), `python-app-unformatted` (lint-clean, not
-ruff-formatted), `rust-app-broken` (a `len_zero` warning), and `rust-app-unformatted` (clippy-clean, not
-rustfmt-formatted); each compiles/imports and passes
+ruff-formatted), `rust-app-broken` (a `len_zero` warning), `rust-app-unformatted` (clippy-clean, not
+rustfmt-formatted), and `bun-app-vulnerable` (lodash 4.17.20, an advisory with a shipped fix, shared
+with `audit-bun`); each compiles/imports and passes
 without its gate, so only the gate can catch it. A few things that are easy
 to get wrong when writing that kind of test:
 

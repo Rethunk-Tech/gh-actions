@@ -156,8 +156,13 @@ jobs:
       - name: assert deps installed and no exact cache hit
         env:
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
         run: |
           test -d .github/test-fixtures/bun-app/node_modules/is-odd
+          if [ "$AUDIT" != "skipped" ]; then
+            echo "::error::expected audit-outcome=skipped when run-audit is off, got '$AUDIT'" >&2
+            exit 1
+          fi
           if [ "$CACHE_HIT" = "true" ]; then
             echo "::error::expected no exact cache-hit on cold run, got 'true'" >&2
             exit 1
@@ -271,6 +276,52 @@ jobs:
           working-directory: .github
           skip-install: "true"
       - run: bun --version
+
+  test-setup-bun-audit-pass:
+    name: setup-bun self-test (audit gate, clean fixture)
+    needs: test-setup-bun-cold
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app
+          run-audit: "true"
+      - name: assert the audit gate passed
+        env:
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
+        run: |
+          if [ "$AUDIT" != "success" ]; then
+            echo "::error::expected audit-outcome=success on the clean fixture, got '$AUDIT'" >&2
+            exit 1
+          fi
+
+  # Proves the run-audit gate fires: lodash 4.17.20 has a shipped fix, so the shared
+  # audit-bun auditor fails. The same fixture is what audit-bun's own self-test uses.
+  test-setup-bun-audit-fail:
+    name: setup-bun self-test (audit gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app-vulnerable
+          run-audit: "true"
+      - name: assert the audit gate failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$AUDIT" != "failure" ]; then
+            echo "::error::expected the audit gate to fail on a fixable advisory, got composite '$OUTCOME', audit '$AUDIT'" >&2
+            exit 1
+          fi
 
   test-setup-nextjs-bun-cold:
     name: setup-nextjs-bun self-test (cold cache)

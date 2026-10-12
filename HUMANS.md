@@ -32,7 +32,8 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 
 Outputs: `cache-hit` — whether the Bun install-store cache was hit. `playwright-cache-hit`
 and `playwright-version` are set when `install-playwright` is on (`playwright-version` is
-`unpinned` if no package.json at `playwright-directory` names a pin).
+`unpinned` if no package.json at `playwright-directory` names a pin). `audit-outcome` is
+`success`, `failure`, or `skipped` when `run-audit` is off.
 
 `install-playwright` skips `playwright install-deps` when the only missing system packages are
 fonts, which on `ubuntu-latest` is always the case for Chromium. A repo that asserts pixel
@@ -63,6 +64,18 @@ setup steps that have to happen first (e.g. cloning sibling repos for Bun `link:
     skip-install: "true"     # only installs the bun binary; no lockfile check, no bun install.
                              # The install-store cache still runs whenever a bun.lock is
                              # present, so a caller that installs later keeps the cache.
+```
+
+**Dependency audit** — opt-in, off by default. When `run-audit` is true, runs the same
+auditor as [`audit-bun`](#audit-bun) (`audit-bun/audit.ts`) after install: fails only on
+advisories whose fix has shipped. An advisory with no patched release warns and does not
+fail the job. A caller that already has an `audit-bun` step leaves `run-audit` unset.
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
+  with:
+    run-audit: "true"
+    # working-directory: frontend
 ```
 
 ### `setup-nextjs-bun`
