@@ -141,7 +141,10 @@ jobs:
   # content, so their exact cache KEYS never collide. Cold assertions check != 'true' rather
   # than emptiness, so an action that does use restore-keys (setup-go) can legitimately
   # partial-match another fixture's parallel save — a stale EXACT match surviving the reset
-  # job still fails.
+  # job still fails. A job that uses the same fixture as a cold job must wait for that job:
+  # both keys are `<os>-bun-<packageManager>-<lock hash>`, and the sibling's post-step save
+  # is an exact hit if it lands first. Reset already deletes that prefix; the miss is lost
+  # inside the run.
   test-setup-bun-cold:
     name: setup-bun self-test (cold cache)
     needs: reset-self-test-caches
@@ -198,10 +201,11 @@ jobs:
   # the three inputs it reads went undeclared for the life of the feature, which schema
   # validation cannot catch (a reference to an undeclared input is empty, not invalid) and
   # actionlint does not check for composite actions. Cold writes a marker into the extra path
-  # and lets the post step save it; warm asserts the marker came back.
+  # and lets the post step save it; warm asserts the marker came back. Needs the install-store
+  # cold job: this fixture's post step would otherwise publish that job's exact key first.
   test-setup-bun-extra-cache-cold:
     name: setup-bun self-test (extra-paths cache, cold)
-    needs: reset-self-test-caches
+    needs: test-setup-bun-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -462,9 +466,10 @@ jobs:
           fi
 
   # Distinct extra-cache-key so these jobs cannot collide with the bun extra-cache pair.
+  # Needs the install-store cold job: same fixture, so this post step publishes that exact key.
   test-setup-nextjs-bun-extra-cache-cold:
     name: setup-nextjs-bun self-test (extra-paths cache, cold)
-    needs: reset-self-test-caches
+    needs: test-setup-nextjs-bun-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
