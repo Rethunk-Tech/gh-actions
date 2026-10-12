@@ -6,6 +6,9 @@
 .github/test-fixtures/**/node_modules/
 .github/test-fixtures/**/.venv/
 .github/test-fixtures/**/target/
+.github/test-fixtures/**/__pycache__/
+.github/test-fixtures/**/.pytest_cache/
+.github/test-fixtures/**/.ruff_cache/
 
 # Compiled binaries left behind by local `go build`/`go test` runs against a Go fixture. Scoped
 # one level INSIDE a fixture directory (`*/`, not `**/`): `**/*-broken` also matches the
