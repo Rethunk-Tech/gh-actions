@@ -33,7 +33,8 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 Outputs: `cache-hit` — whether the Bun install-store cache was hit. `playwright-cache-hit`
 and `playwright-version` are set when `install-playwright` is on (`playwright-version` is
 `unpinned` if no package.json at `playwright-directory` names a pin). `audit-outcome` is
-`success`, `failure`, or `skipped` when `run-audit` is off.
+`success`, `failure`, or `skipped` when `run-audit` is off. `test-outcome` is `success`,
+`failure`, or `skipped` when `run-test` is off.
 
 `install-playwright` skips `playwright install-deps` when the only missing system packages are
 fonts, which on `ubuntu-latest` is always the case for Chromium. A repo that asserts pixel
@@ -75,6 +76,18 @@ fail the job. A caller that already has an `audit-bun` step leaves `run-audit` u
 - uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
   with:
     run-audit: "true"
+    # working-directory: frontend
+```
+
+**Test gate** — opt-in, off by default. When `run-test` is true, runs `bun test` from
+`working-directory` after install, with `continue-on-error` on that step and a row in the same
+summary table as the audit gate. A caller that already runs its own test step leaves `run-test`
+unset.
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
+  with:
+    run-test: "true"
     # working-directory: frontend
 ```
 

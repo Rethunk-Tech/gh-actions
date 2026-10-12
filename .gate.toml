@@ -8,4 +8,9 @@ run = "python3 scripts/check-setup-bun-drift.py"
 
 # CI asserts the shared actions fail on these fixtures, so they are broken on purpose and gate leaves them out.
 [detect]
-exclude = ["python-app-broken", "python-app-unformatted", "rust-app-failing"]
+exclude = [
+  "python-app-broken",
+  "python-app-unformatted",
+  "rust-app-failing",
+  "bun-app-failing",
+]

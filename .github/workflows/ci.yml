@@ -157,10 +157,15 @@ jobs:
         env:
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
           AUDIT: ${{ steps.setup.outputs.audit-outcome }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
         run: |
           test -d .github/test-fixtures/bun-app/node_modules/is-odd
           if [ "$AUDIT" != "skipped" ]; then
             echo "::error::expected audit-outcome=skipped when run-audit is off, got '$AUDIT'" >&2
+            exit 1
+          fi
+          if [ "$TEST" != "skipped" ]; then
+            echo "::error::expected test-outcome=skipped when run-test is off, got '$TEST'" >&2
             exit 1
           fi
           if [ "$CACHE_HIT" = "true" ]; then
@@ -320,6 +325,53 @@ jobs:
         run: |
           if [ "$OUTCOME" != "failure" ] || [ "$AUDIT" != "failure" ]; then
             echo "::error::expected the audit gate to fail on a fixable advisory, got composite '$OUTCOME', audit '$AUDIT'" >&2
+            exit 1
+          fi
+
+  test-setup-bun-test-pass:
+    name: setup-bun self-test (test gate, clean fixture)
+    needs: test-setup-bun-cold
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app
+          run-test: "true"
+      - name: assert the test gate passed and audit stayed off
+        env:
+          TEST: ${{ steps.setup.outputs.test-outcome }}
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
+        run: |
+          if [ "$TEST" != "success" ] || [ "$AUDIT" != "skipped" ]; then
+            echo "::error::expected test-outcome=success and audit-outcome=skipped, got test '$TEST', audit '$AUDIT'" >&2
+            exit 1
+          fi
+
+  # Proves the run-test gate fires: the fixture's only test assertion fails.
+  test-setup-bun-test-fail:
+    name: setup-bun self-test (test gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app-failing
+          run-test: "true"
+      - name: assert the test gate failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$TEST" != "failure" ] || [ "$AUDIT" != "skipped" ]; then
+            echo "::error::expected the test gate to fail and audit to stay off, got composite '$OUTCOME', test '$TEST', audit '$AUDIT'" >&2
             exit 1
           fi
 

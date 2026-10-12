@@ -2,7 +2,7 @@ name: Setup Bun
 description: >
   Install Bun, restore its install-store cache, optionally install a Node.js runtime alongside
   Bun, optionally install Playwright browsers, then run `bun install`. Optionally run the
-  audit-bun auditor as a gate on the same job — opt-in, off by default.
+  audit-bun auditor and/or `bun test` as gates on the same job — opt-in, off by default.
 
 inputs:
   bun-version:
@@ -98,6 +98,12 @@ inputs:
       this unset.
     required: false
     default: "false"
+  run-test:
+    description: >
+      When true, runs `bun test` from working-directory after install. Separate from run-audit,
+      which does not run the test suite. Off by default.
+    required: false
+    default: "false"
 
 outputs:
   cache-hit:
@@ -116,6 +122,9 @@ outputs:
   audit-outcome:
     description: Outcome of the bun audit gate (success, failure, or skipped when run-audit is off).
     value: ${{ steps.audit.outcome }}
+  test-outcome:
+    description: Outcome of the bun test gate (success, failure, or skipped when run-test is off).
+    value: ${{ steps.test.outcome }}
 
 runs:
   using: composite
@@ -192,6 +201,14 @@ runs:
           bun install
         fi
 
+    - name: bun test
+      id: test
+      if: inputs.run-test == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: bun test
+
     # Same auditor as the audit-bun action (that directory's audit.ts). Called by path so
     # there is one copy, and so this step does not nest a composite action.
     - name: bun audit
@@ -202,12 +219,14 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       run: bun "$GITHUB_ACTION_PATH/../audit-bun/audit.ts"
 
-    - name: Gate on bun audit
-      if: inputs.run-audit == 'true'
+    - name: Gate on bun audit and test
+      if: inputs.run-audit == 'true' || inputs.run-test == 'true'
       shell: bash
       env:
         RUN_AUDIT: ${{ inputs.run-audit }}
+        RUN_TEST: ${{ inputs.run-test }}
         AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+        TEST_OUTCOME: ${{ steps.test.outcome }}
       run: |
         row() {
           local enabled="$1" outcome="$2" label="$3"
@@ -220,16 +239,23 @@ runs:
           fi
         }
         {
-          echo "## setup-bun audit gate"
+          echo "## setup-bun audit/test gate"
           echo "| Check | Result |"
           echo "| --- | --- |"
         } >> "$GITHUB_STEP_SUMMARY"
         row "$RUN_AUDIT" "$AUDIT_OUTCOME" "bun audit"
+        row "$RUN_TEST" "$TEST_OUTCOME" "bun test"
 
+        failed=0
         if [ "$AUDIT_OUTCOME" = "failure" ]; then
           echo "::error::bun audit found a fixable advisory — see the bun audit step above" >&2
-          exit 1
+          failed=1
         fi
+        if [ "$TEST_OUTCOME" = "failure" ]; then
+          echo "::error::bun test failed — see the bun test step above" >&2
+          failed=1
+        fi
+        exit "$failed"
 
     # Version-keyed rather than lockfile-keyed on purpose: Playwright's own CI caching guide
     # keys on the @playwright/test devDependency version specifically, because a browser build
