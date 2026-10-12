@@ -584,10 +584,15 @@ jobs:
       - name: assert build works after the race gate and cache hit matches the phase
         env:
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
           PHASE: ${{ matrix.phase }}
         working-directory: .github/test-fixtures/go-app
         run: |
           go build ./...
+          if [ "$TEST" != "skipped" ]; then
+            echo "::error::expected test-outcome=skipped when run-test is off, got '$TEST'" >&2
+            exit 1
+          fi
           if [ "$PHASE" = "cold" ] && [ "$CACHE_HIT" = "true" ]; then
             echo "::error::expected no exact cache-hit on cold run, got 'true'" >&2
             exit 1
@@ -1021,6 +1026,53 @@ jobs:
         run: |
           if [ "$OUTCOME" != "failure" ] || [ "$RACE" != "failure" ]; then
             echo "::error::expected the race gate to fail on a racy fixture, got composite '$OUTCOME', race '$RACE'" >&2
+            exit 1
+          fi
+
+  test-setup-go-test-pass:
+    name: setup-go self-test (test gate, clean fixture)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-app/go.mod
+          run-test: "true"
+      - name: assert the test gate passed and the race gate stayed off
+        env:
+          TEST: ${{ steps.setup.outputs.test-outcome }}
+          RACE: ${{ steps.setup.outputs.test-race-outcome }}
+        run: |
+          if [ "$TEST" != "success" ] || [ "$RACE" != "skipped" ]; then
+            echo "::error::expected test-outcome=success and test-race-outcome=skipped, got test '$TEST', race '$RACE'" >&2
+            exit 1
+          fi
+
+  # Proves the run-test gate fires without -race: the fixture's only test fails under plain go test.
+  test-setup-go-test-fail:
+    name: setup-go self-test (test gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-app-failing/go.mod
+          run-test: "true"
+      - name: assert the test gate failed and the race gate stayed off
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
+          RACE: ${{ steps.setup.outputs.test-race-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$TEST" != "failure" ] || [ "$RACE" != "skipped" ]; then
+            echo "::error::expected the test gate to fail and the race gate to stay off, got composite '$OUTCOME', test '$TEST', race '$RACE'" >&2
             exit 1
           fi
 

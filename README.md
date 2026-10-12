@@ -36,7 +36,7 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   documented CI caching guide (lockfile hash + source-file hash, independently invalidated).
 - `setup-go` caches modules and the build cache per job, so a lint job never overwrites the
   `-race` build a test job needs, with a same-Go-version fallback across jobs.
-- `setup-go` also bundles opt-in `go test -race ./...`, golangci-lint, `golangci-lint fmt`, and govulncheck gates,
+- `setup-go` also bundles opt-in `go test ./...` (no `-race`), `go test -race ./...`, golangci-lint, `golangci-lint fmt`, and govulncheck gates,
   each `continue-on-error` behind a final gate step — enabling more than one still surfaces
   every finding even if one fails.
 - `setup-python` wraps `astral-sh/setup-uv` with the cache forced on (upstream's `auto` default

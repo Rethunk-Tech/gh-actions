@@ -125,8 +125,10 @@ outputs as `setup-bun` when `install-playwright` is on.
 ### `setup-go`
 
 Go toolchain via `actions/setup-go`, plus a module/build cache keyed per job. Optionally also
-runs `go test -race ./...`, golangci-lint, `golangci-lint fmt --diff`, and/or govulncheck as
-gates on the same job — opt-in, off by default.
+runs `go test ./...`, `go test -race ./...`, golangci-lint, `golangci-lint fmt --diff`, and/or
+govulncheck as gates on the same job — opt-in, off by default. `go test` and `go test -race`
+are separate inputs: `run-test` does not pass `-race`, and `run-test-race` does not run the
+plain suite.
 
 ```yaml
 - uses: actions/checkout@v7
@@ -137,17 +139,30 @@ gates on the same job — opt-in, off by default.
     # cache-dependency-path: "**/go.sum"  # default: the go.sum next to go-version-file, plus go-version-file
 ```
 
-Outputs: `go-version`, `cache-hit` (an exact key match for this job), and `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
+Outputs: `go-version`, `cache-hit` (an exact key match for this job), and `test-outcome`, `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
 
 The cache key is Go version + dependency hash + job id, so a job with `run-test-race` enabled and
 a lint-only job each restore the build cache they filled themselves — a lint job's cache is never
 the race-test cache. A job's first run, or a dependency bump, falls back to the newest cache any
 job saved for the same Go version. Matrix legs share one job id and therefore one cache entry.
 
-**Race-test gate** — set `run-test-race` to `"true"` in the job that owns the module's test gate.
-It runs `go test -race ./...` from the directory named by `go-version-file` (or the matching
-`cache-dependency-path` when that is the path used to locate the module). The input defaults to
-`"false"` so existing setup-only and lint/vuln-only callers do not start running tests.
+**Test gate** — set `run-test` to `"true"` in the job that owns the module's plain test gate.
+It runs `go test ./...` from the directory named by `go-version-file` (or the matching
+`cache-dependency-path` when that is the path used to locate the module). The command does not
+pass `-race`. The input defaults to `"false"` so existing setup-only and lint/vuln-only callers
+do not start running tests.
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.14
+  with:
+    run-test: "true"
+    go-version-file: backend/go.mod
+```
+
+**Race-test gate** — set `run-test-race` to `"true"` in the job that owns the module's race gate.
+It runs `go test -race ./...` from that same directory. Separate from `run-test`: enabling one
+does not enable the other. The input defaults to `"false"` so existing setup-only and
+lint/vuln-only callers do not start running tests.
 
 ```yaml
 - uses: Rethunk-Tech/gh-actions/setup-go@v1.14

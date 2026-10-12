@@ -1,9 +1,9 @@
 name: Setup Go
 description: >
   Install a Go toolchain via actions/setup-go and cache its module and build caches per job.
-  Optionally also run the race-enabled test suite, golangci-lint, golangci-lint fmt, and/or
-  govulncheck as gates on the same job — opt-in, off by default. Writes a pass/fail table to the
-  job's step summary.
+  Optionally also run `go test ./...`, the race-enabled test suite, golangci-lint,
+  golangci-lint fmt, and/or govulncheck as gates on the same job — opt-in, off by default.
+  Writes a pass/fail table to the job's step summary.
 
 inputs:
   go-version:
@@ -31,6 +31,14 @@ inputs:
     description: >
       When true, runs `go test -race ./...` from the module directory after the toolchain is set
       up. Turns this action into a test gate for callers who opt in — off by default.
+      Separate from run-test, which runs `go test ./...` and does not pass `-race`.
+    required: false
+    default: "false"
+  run-test:
+    description: >
+      When true, runs `go test ./...` from the module directory after the toolchain is set up.
+      Separate from run-test-race: this command does not pass `-race`, and setting run-test does
+      not enable the race gate. Off by default.
     required: false
     default: "false"
   run-lint:
@@ -86,6 +94,9 @@ outputs:
   test-race-outcome:
     description: Outcome of the `go test -race` gate (success, failure or skipped when run-test-race is off).
     value: ${{ steps.test-race.outcome }}
+  test-outcome:
+    description: Outcome of the `go test` gate (success, failure or skipped when run-test is off).
+    value: ${{ steps.test.outcome }}
   lint-outcome:
     description: Outcome of the golangci-lint gate (success, failure or skipped when run-lint is off).
     value: ${{ steps.lint.outcome }}
@@ -123,7 +134,7 @@ runs:
       env:
         GO_VERSION_FILE: ${{ inputs.go-version-file }}
         CACHE_DEPENDENCY_PATH: ${{ inputs.cache-dependency-path }}
-        NEEDS_DIR: ${{ inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' }}
+        NEEDS_DIR: ${{ inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' }}
       run: |
         if [ -n "$CACHE_DEPENDENCY_PATH" ]; then
           path="$CACHE_DEPENDENCY_PATH"
@@ -142,7 +153,7 @@ runs:
         case "$path" in
           *$'\n'*|*'*'*)
             if [ "$NEEDS_DIR" = "true" ]; then
-              echo "::error::run-test-race/run-lint/run-fmt/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave the gate inputs off for this caller." >&2
+              echo "::error::run-test/run-test-race/run-lint/run-fmt/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave the gate inputs off for this caller." >&2
               exit 1
             fi
             ;;
@@ -245,6 +256,14 @@ runs:
     # rather than failing fast, so a caller enabling more than one sees every finding in one run.
     # A masked continue-on-error failure still shows its own warning icon in the Actions UI, so
     # each tool's result stays individually visible.
+    - name: go test
+      id: test
+      if: inputs.run-test == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ steps.moddir.outputs.dir }}
+      run: go test ./...
+
     - name: go test -race
       id: test-race
       if: inputs.run-test-race == 'true'
@@ -325,13 +344,15 @@ runs:
     # business opinionating about. A caller that wants that keeps its own downstream step
     # reading govulncheck's `-json` output directly instead of enabling run-govulncheck here.
     - name: Gate on test/lint/fmt/govulncheck results
-      if: inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true'
+      if: inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true'
       shell: bash
       env:
+        RUN_TEST: ${{ inputs.run-test }}
         RUN_TEST_RACE: ${{ inputs.run-test-race }}
         RUN_LINT: ${{ inputs.run-lint }}
         RUN_FMT: ${{ inputs.run-fmt }}
         RUN_VULN: ${{ inputs.run-govulncheck }}
+        TEST_OUTCOME: ${{ steps.test.outcome }}
         TEST_RACE_OUTCOME: ${{ steps.test-race.outcome }}
         LINT_OUTCOME: ${{ steps.lint.outcome }}
         FMT_OUTCOME: ${{ steps.fmt.outcome }}
@@ -352,12 +373,17 @@ runs:
           echo "| Check | Result |"
           echo "| --- | --- |"
         } >> "$GITHUB_STEP_SUMMARY"
+        row "$RUN_TEST" "$TEST_OUTCOME" "go test"
         row "$RUN_TEST_RACE" "$TEST_RACE_OUTCOME" "go test -race"
         row "$RUN_LINT" "$LINT_OUTCOME" "golangci-lint"
         row "$RUN_FMT" "$FMT_OUTCOME" "golangci-lint fmt --diff"
         row "$RUN_VULN" "$VULN_OUTCOME" "govulncheck"
 
         failed=0
+        if [ "$TEST_OUTCOME" = "failure" ]; then
+          echo "::error::go test failed — see the go test step above" >&2
+          failed=1
+        fi
         if [ "$TEST_RACE_OUTCOME" = "failure" ]; then
           echo "::error::go test -race failed — see the go test -race step above" >&2
           failed=1
