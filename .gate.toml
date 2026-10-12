@@ -10,6 +10,7 @@ run = "python3 scripts/check-setup-bun-drift.py"
 [detect]
 exclude = [
   "python-app-broken",
+  "python-app-failing",
   "python-app-unformatted",
   "rust-app-failing",
   "bun-app-failing",

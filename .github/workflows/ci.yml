@@ -1092,9 +1092,14 @@ jobs:
       - name: assert deps synced and no exact cache hit
         env:
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
         working-directory: .github/test-fixtures/python-app
         run: |
           uv run ruff --version
+          if [ "$TEST" != "skipped" ]; then
+            echo "::error::expected test-outcome=skipped when run-test is off, got '$TEST'" >&2
+            exit 1
+          fi
           if [ "$CACHE_HIT" = "true" ]; then
             echo "::error::expected no exact cache-hit on cold run, got 'true'" >&2
             exit 1
@@ -1146,6 +1151,58 @@ jobs:
           run-ruff: "true"
           run-ruff-format: "true"
           run-audit: "true"
+
+  test-setup-python-test-pass:
+    name: setup-python self-test (test gate, clean fixture)
+    needs: test-setup-python-cold
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-python
+        with:
+          working-directory: .github/test-fixtures/python-app
+          install-args: --locked --group dev
+          run-test: "true"
+      - name: assert the test gate passed and the other gates stayed off
+        env:
+          TEST: ${{ steps.setup.outputs.test-outcome }}
+          RUFF: ${{ steps.setup.outputs.ruff-outcome }}
+          FORMAT: ${{ steps.setup.outputs.ruff-format-outcome }}
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
+        run: |
+          if [ "$TEST" != "success" ] || [ "$RUFF" != "skipped" ] || [ "$FORMAT" != "skipped" ] || [ "$AUDIT" != "skipped" ]; then
+            echo "::error::expected test-outcome=success and the other gates skipped, got test '$TEST', ruff '$RUFF', format '$FORMAT', audit '$AUDIT'" >&2
+            exit 1
+          fi
+
+  # Proves the run-test gate fires: the fixture's only assertion fails.
+  test-setup-python-test-fail:
+    name: setup-python self-test (test gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-python
+        with:
+          working-directory: .github/test-fixtures/python-app-failing
+          install-args: --locked --group dev
+          run-test: "true"
+      - name: assert the test gate failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
+          RUFF: ${{ steps.setup.outputs.ruff-outcome }}
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$TEST" != "failure" ] || [ "$RUFF" != "skipped" ] || [ "$AUDIT" != "skipped" ]; then
+            echo "::error::expected the test gate to fail and ruff and audit to stay off, got composite '$OUTCOME', test '$TEST', ruff '$RUFF', audit '$AUDIT'" >&2
+            exit 1
+          fi
 
   # Proves the lint gate actually fires rather than silently no-op'ing — a fixture with a real
   # F401 (an unused `os` import), confirmed locally to import clean but fail `ruff check` — and

@@ -41,7 +41,7 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   every finding even if one fails.
 - `setup-python` wraps `astral-sh/setup-uv` with the cache forced on (upstream's `auto` default
   silently disables it on exactly the release and tag-push events where a cold install costs
-  most), plus the same opt-in gate shape for ruff and `uv audit`.
+  most), plus the same opt-in gate shape for ruff, `uv audit`, and `uv run pytest`.
 - `audit-bun` runs `bun audit --json` and fails only on advisories with a shipped fix; the rest warn
   with their `bun why` chain. `setup-bun`'s opt-in `run-audit` runs that same auditor, and its
   opt-in `run-test` runs `bun test`.

@@ -1,8 +1,8 @@
 name: Setup Python (uv)
 description: >
   Install uv and a Python interpreter via astral-sh/setup-uv, with its dependency cache
-  enabled, then run `uv sync`. Optionally also run ruff and/or `uv audit` as a gate on the same
-  job — opt-in, off by default. Writes a pass/fail table to the job's step summary.
+  enabled, then run `uv sync`. Optionally also run ruff, `uv audit`, and/or `uv run pytest` as
+  gates on the same job — opt-in, off by default. Writes a pass/fail table to the job's step summary.
 
 inputs:
   python-version:
@@ -77,6 +77,13 @@ inputs:
       pinned-but-uninstalled extra carrying an advisory still fails.
     required: false
     default: "--locked"
+  run-test:
+    description: >
+      When true, runs `uv run pytest` from working-directory after the sync. Separate from
+      run-ruff, run-ruff-format, and run-audit, which do not run the test suite. Requires pytest
+      in the synced environment (see install-args). Off by default.
+    required: false
+    default: "false"
 
 outputs:
   uv-version:
@@ -97,6 +104,9 @@ outputs:
   audit-outcome:
     description: Outcome of the `uv audit` gate (success, failure or skipped when run-audit is off).
     value: ${{ steps.audit.outcome }}
+  test-outcome:
+    description: Outcome of the pytest gate (success, failure, or skipped when run-test is off).
+    value: ${{ steps.test.outcome }}
 
 runs:
   using: composite
@@ -132,7 +142,7 @@ runs:
           uv sync
         fi
 
-    # All three gates below run with continue-on-error: true and report through the final gate
+    # All four gates below run with continue-on-error: true and report through the final gate
     # step rather than failing fast, so a caller with more than one enabled sees every finding in
     # one run instead of losing the later tools' results to the first one's failure. A masked
     # continue-on-error failure still shows its own warning icon in the Actions UI, so each
@@ -181,19 +191,29 @@ runs:
           uv audit
         fi
 
+    - name: pytest
+      id: test
+      if: inputs.run-test == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: uv run pytest
+
     # Same plain pass/fail table setup-go writes, and deliberately as dumb: severity tiering or
     # JSON parsing of an audit report is per-caller business logic this generic fleet action has
     # no business opinionating about. A caller that wants that keeps its own downstream step.
-    - name: Gate on ruff/audit results
-      if: inputs.run-ruff == 'true' || inputs.run-ruff-format == 'true' || inputs.run-audit == 'true'
+    - name: Gate on ruff/audit/test results
+      if: inputs.run-ruff == 'true' || inputs.run-ruff-format == 'true' || inputs.run-audit == 'true' || inputs.run-test == 'true'
       shell: bash
       env:
         RUN_RUFF: ${{ inputs.run-ruff }}
         RUN_RUFF_FORMAT: ${{ inputs.run-ruff-format }}
         RUN_AUDIT: ${{ inputs.run-audit }}
+        RUN_TEST: ${{ inputs.run-test }}
         RUFF_OUTCOME: ${{ steps.ruff.outcome }}
         RUFF_FORMAT_OUTCOME: ${{ steps.ruff-format.outcome }}
         AUDIT_OUTCOME: ${{ steps.audit.outcome }}
+        TEST_OUTCOME: ${{ steps.test.outcome }}
       run: |
         row() {
           local enabled="$1" outcome="$2" label="$3"
@@ -206,13 +226,14 @@ runs:
           fi
         }
         {
-          echo "## setup-python lint/audit gate"
+          echo "## setup-python lint/audit/test gate"
           echo "| Check | Result |"
           echo "| --- | --- |"
         } >> "$GITHUB_STEP_SUMMARY"
         row "$RUN_RUFF" "$RUFF_OUTCOME" "ruff check"
         row "$RUN_RUFF_FORMAT" "$RUFF_FORMAT_OUTCOME" "ruff format --check"
         row "$RUN_AUDIT" "$AUDIT_OUTCOME" "uv audit"
+        row "$RUN_TEST" "$TEST_OUTCOME" "uv run pytest"
 
         failed=0
         if [ "$RUFF_OUTCOME" = "failure" ]; then
@@ -225,6 +246,10 @@ runs:
         fi
         if [ "$AUDIT_OUTCOME" = "failure" ]; then
           echo "::error::uv audit found vulnerabilities — see the uv audit step above" >&2
+          failed=1
+        fi
+        if [ "$TEST_OUTCOME" = "failure" ]; then
+          echo "::error::uv run pytest failed — see the pytest step above" >&2
           failed=1
         fi
         exit "$failed"

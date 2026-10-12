@@ -183,8 +183,8 @@ fine; it's the invocation shape itself, e.g. raw `-json` output, that doesn't ma
 ### `setup-python`
 
 uv + a Python interpreter via `astral-sh/setup-uv`, with its dependency cache enabled, then
-`uv sync`. Optionally also runs ruff and/or `uv audit` as a gate on the same job — opt-in, off
-by default.
+`uv sync`. Optionally also runs ruff, `uv audit`, and/or `uv run pytest` as gates on the same
+job — opt-in, off by default.
 
 ```yaml
 - uses: actions/checkout@v7
@@ -196,7 +196,7 @@ by default.
     # install-args: --locked --group dev   # default: --locked (REPLACES, does not append)
 ```
 
-Outputs: `uv-version`, `python-version`, `cache-hit`, and `ruff-outcome`, `ruff-format-outcome`, `audit-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off).
+Outputs: `uv-version`, `python-version`, `cache-hit`, and `ruff-outcome`, `ruff-format-outcome`, `audit-outcome`, `test-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off).
 
 `python-version` selects the interpreter by exporting `UV_PYTHON`; it does not install one
 itself. uv downloads a managed interpreter when `uv sync`/`uv run` needs it, so this is
@@ -227,6 +227,19 @@ than one still surfaces every finding even if an earlier one fails:
 
 `uv audit` is still marked experimental upstream and may change without warning — that is why
 `run-audit` is opt-in rather than on by default.
+
+**Test gate** — opt-in, off by default. When `run-test` is true, runs `uv run pytest` from
+`working-directory` after the sync, with `continue-on-error` on that step and a row in the same
+summary table. Separate from the ruff and audit gates, which do not run the suite. Requires
+pytest in the synced environment. A caller that already runs its own test step leaves `run-test`
+unset.
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-python@v1.14
+  with:
+    install-args: --locked --group dev
+    run-test: "true"
+```
 
 **Toolchain only, no sync** — a caller with no project of its own, using uv purely to put `uv`
 and `uvx` on PATH for a standalone tool:

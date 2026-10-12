@@ -1,0 +1,14 @@
+[project]
+name = "python-app-failing-fixture"
+version = "0.0.0"
+description = "Fixture whose only test fails, proving setup-python's test gate fires."
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.15.0"]
+
+# A fixture is never installed as a package — this keeps `uv sync` to just the dependency
+# groups, with no build backend to configure or keep working.
+[tool.uv]
+package = false
