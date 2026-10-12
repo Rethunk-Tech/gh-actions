@@ -240,9 +240,10 @@ cache keyed per job.
     # working-directory: .               # where Cargo.lock and rust-toolchain.toml live
     # run-clippy: "true"                 # default false
     # run-fmt: "true"                    # default false; separate from run-clippy
+    # run-test: "true"                   # default false; separate from run-clippy and run-fmt
 ```
 
-Outputs: `cache-hit` (an exact key match for this job), `clippy-outcome`, and `fmt-outcome` (`success`, `failure`, or `skipped` when that input is off).
+Outputs: `cache-hit` (an exact key match for this job), `clippy-outcome`, `fmt-outcome`, and `test-outcome` (`success`, `failure`, or `skipped` when that input is off).
 
 **Clippy gate** — runs `cargo clippy --locked --all-targets -- -D warnings` from
 `working-directory`, with `continue-on-error` on that step and a final gate step, same shape as
@@ -256,11 +257,17 @@ component when it is not already on the toolchain. Off by default, and separate 
 `run-clippy`, because clippy does not check formatting. A caller whose invocation differs
 keeps its own step and leaves `run-fmt` unset.
 
+**Test gate** — runs `cargo test --locked --all-targets` from `working-directory`, with
+`continue-on-error` on that step and a row in the same summary table. Off by default, and
+separate from `run-clippy` and `run-fmt`, which do not run the test suite. A caller whose
+invocation differs keeps its own step and leaves `run-test` unset.
+
 ```yaml
 - uses: Rethunk-Tech/gh-actions/setup-rust@v1.14
   with:
     run-clippy: "true"
     run-fmt: "true"
+    run-test: "true"
     # working-directory: .
 ```
 

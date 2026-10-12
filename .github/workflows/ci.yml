@@ -568,6 +568,7 @@ jobs:
           CACHE_HIT: ${{ steps.setup.outputs.cache-hit }}
           CLIPPY: ${{ steps.setup.outputs.clippy-outcome }}
           FMT: ${{ steps.setup.outputs.fmt-outcome }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
           PHASE: ${{ matrix.phase }}
         working-directory: .github/test-fixtures/rust-app
         run: |
@@ -579,6 +580,10 @@ jobs:
           fi
           if [ "$FMT" != "skipped" ]; then
             echo "::error::expected fmt-outcome=skipped when run-fmt is off, got '$FMT'" >&2
+            exit 1
+          fi
+          if [ "$TEST" != "skipped" ]; then
+            echo "::error::expected test-outcome=skipped when run-test is off, got '$TEST'" >&2
             exit 1
           fi
           if [ "$PHASE" = "cold" ] && [ "$CACHE_HIT" = "true" ]; then
@@ -610,6 +615,7 @@ jobs:
         env:
           CLIPPY: ${{ steps.setup.outputs.clippy-outcome }}
           FMT: ${{ steps.setup.outputs.fmt-outcome }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
         working-directory: .github/test-fixtures/rust-app
         run: |
           cargo +stable fmt --check
@@ -623,9 +629,13 @@ jobs:
             echo "::error::expected fmt-outcome=skipped when run-fmt is off, got '$FMT'" >&2
             exit 1
           fi
+          if [ "$TEST" != "skipped" ]; then
+            echo "::error::expected test-outcome=skipped when run-test is off, got '$TEST'" >&2
+            exit 1
+          fi
 
   test-setup-rust-clippy-pass:
-    name: setup-rust self-test (clippy + fmt gates, clean fixture)
+    name: setup-rust self-test (clippy + fmt + test gates, clean fixture)
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -637,13 +647,15 @@ jobs:
           working-directory: .github/test-fixtures/rust-app
           run-clippy: "true"
           run-fmt: "true"
-      - name: assert the clippy and fmt gates passed
+          run-test: "true"
+      - name: assert the clippy, fmt, and test gates passed
         env:
           CLIPPY: ${{ steps.setup.outputs.clippy-outcome }}
           FMT: ${{ steps.setup.outputs.fmt-outcome }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
         run: |
-          if [ "$CLIPPY" != "success" ] || [ "$FMT" != "success" ]; then
-            echo "::error::expected clippy-outcome and fmt-outcome success on the clean fixture, got clippy '$CLIPPY', fmt '$FMT'" >&2
+          if [ "$CLIPPY" != "success" ] || [ "$FMT" != "success" ] || [ "$TEST" != "success" ]; then
+            echo "::error::expected clippy, fmt, and test outcomes success on the clean fixture, got clippy '$CLIPPY', fmt '$FMT', test '$TEST'" >&2
             exit 1
           fi
 
@@ -696,6 +708,34 @@ jobs:
         run: |
           if [ "$OUTCOME" != "failure" ] || [ "$FMT" != "failure" ] || [ "$CLIPPY" != "success" ]; then
             echo "::error::expected cargo clippy to pass and cargo fmt to fail, got composite '$OUTCOME', clippy '$CLIPPY', fmt '$FMT'" >&2
+            exit 1
+          fi
+
+  # Proves the run-test gate fires: the fixture is clippy-clean and rustfmt-clean, and one test panics.
+  test-setup-rust-test-catches-failure:
+    name: setup-rust self-test (test gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-rust
+        with:
+          working-directory: .github/test-fixtures/rust-app-failing
+          run-clippy: "true"
+          run-fmt: "true"
+          run-test: "true"
+      - name: assert only the test gate failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          CLIPPY: ${{ steps.setup.outputs.clippy-outcome }}
+          FMT: ${{ steps.setup.outputs.fmt-outcome }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$TEST" != "failure" ] || [ "$CLIPPY" != "success" ] || [ "$FMT" != "success" ]; then
+            echo "::error::expected cargo test to fail and clippy and fmt to pass, got composite '$OUTCOME', clippy '$CLIPPY', fmt '$FMT', test '$TEST'" >&2
             exit 1
           fi
 

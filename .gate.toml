@@ -6,6 +6,6 @@ run = "bun test audit-bun"
 [gates.setup-bun-drift]
 run = "python3 scripts/check-setup-bun-drift.py"
 
-# CI asserts the shared actions fail on these two fixtures, so they are broken on purpose and gate leaves them out.
+# CI asserts the shared actions fail on these fixtures, so they are broken on purpose and gate leaves them out.
 [detect]
-exclude = ["python-app-broken", "python-app-unformatted"]
+exclude = ["python-app-broken", "python-app-unformatted", "rust-app-failing"]

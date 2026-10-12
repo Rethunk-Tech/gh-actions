@@ -73,9 +73,10 @@ different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `u
 - **No `actions/checkout`.** The caller does that first, before the `uses:` line — standard
   composite-action convention.
 - **No project-specific build/test steps** — those are commands that vary too much per repo to
-  centralize; they stay in the caller's own job. The standardized `setup-go` race gate is the
-  deliberate test exception: its opt-in `run-test-race` always runs the canon command
-  `go test -race ./...`. **Lint/security-gate steps are the other deliberate exception**
+  centralize; they stay in the caller's own job. The standardized test gates are the
+  deliberate test exception: `setup-go`'s opt-in `run-test-race` always runs `go test -race ./...`,
+  and `setup-rust`'s opt-in `run-test` always runs `cargo test --locked --all-targets`.
+  **Lint/security-gate steps are the other deliberate exception**
   (`setup-go`'s opt-in `run-lint`/`run-fmt`/`run-govulncheck`, `setup-python`'s
   `run-ruff`/`run-ruff-format`/`run-audit`, `setup-rust`'s `run-clippy`/`run-fmt`, and
   `setup-bun`'s `run-audit`, all off by default):
@@ -141,7 +142,7 @@ before committing, and in CI via `.github/workflows/ci.yml`'s self-test jobs (`t
 rather than silently no-op'ing — `go-app-broken` (an errcheck violation) and `python-app-broken`
 (an F401 unused import), `go-app-race` (a data race), `go-app-unformatted` (lint-clean, not gofmt-formatted), `python-app-unformatted` (lint-clean, not
 ruff-formatted), `rust-app-broken` (a `len_zero` warning), `rust-app-unformatted` (clippy-clean, not
-rustfmt-formatted), and `bun-app-vulnerable` (lodash 4.17.20, an advisory with a shipped fix, shared
+rustfmt-formatted), `rust-app-failing` (clippy-clean and rustfmt-clean, one test panics), and `bun-app-vulnerable` (lodash 4.17.20, an advisory with a shipped fix, shared
 with `audit-bun`); each compiles/imports and passes
 without its gate, so only the gate can catch it. A few things that are easy
 to get wrong when writing that kind of test:
@@ -238,4 +239,4 @@ actions themselves need a GitHub runner and are not reproducible locally. Warm: 
 5 CPU-s. Cold (fresh `GOCACHE`, `XDG_CACHE_HOME` and golangci-lint cache): 4.8 s wall, 28 CPU-s, the
 `go-app` chain being the slowest step. No oversubscription and no duplicated steps.
 
-`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing) and `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`). It also lists the two Python fixtures that are broken on purpose (`python-app-broken`, `python-app-unformatted`) under `[detect] exclude`, because gate gates every directory CI names and those two fail by design. Warm with v0.6.5: 1.1 s wall, 4.7 CPU-s.
+`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing) and `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`). It also lists the fixtures that are broken on purpose (`python-app-broken`, `python-app-unformatted`, `rust-app-failing`) under `[detect] exclude`, because gate gates every directory CI names and those fail by design. Warm with v0.6.5: 1.1 s wall, 4.7 CPU-s.

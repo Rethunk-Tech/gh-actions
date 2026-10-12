@@ -2,8 +2,8 @@ name: Setup Rust
 description: >
   Install a Rust toolchain with the runner's preinstalled rustup — from rust-toolchain.toml or an
   explicit channel — plus components and targets, and cache the cargo registry, git
-  dependencies and target/ per job. Optionally run cargo clippy and/or cargo fmt as gates on
-  the same job — opt-in, off by default.
+  dependencies and target/ per job. Optionally run cargo clippy, cargo fmt, and/or
+  cargo test as gates on the same job — opt-in, off by default.
 
 inputs:
   toolchain:
@@ -42,6 +42,12 @@ inputs:
       fail every repo that has only ever run clippy. Off by default.
     required: false
     default: "false"
+  run-test:
+    description: >
+      When true, runs `cargo test --locked --all-targets` from working-directory.
+      Separate from run-clippy and run-fmt, which do not run the test suite. Off by default.
+    required: false
+    default: "false"
 
 outputs:
   cache-hit:
@@ -53,6 +59,9 @@ outputs:
   fmt-outcome:
     description: Outcome of the cargo fmt gate (success, failure, or skipped when run-fmt is off).
     value: ${{ steps.fmt.outcome }}
+  test-outcome:
+    description: Outcome of the cargo test gate (success, failure, or skipped when run-test is off).
+    value: ${{ steps.test.outcome }}
 
 runs:
   using: composite
@@ -163,14 +172,24 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       run: cargo fmt --all -- --check
 
-    - name: Gate on clippy and fmt results
-      if: inputs.run-clippy == 'true' || inputs.run-fmt == 'true'
+    - name: cargo test
+      id: test
+      if: inputs.run-test == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: cargo test --locked --all-targets
+
+    - name: Gate on clippy, fmt, and test results
+      if: inputs.run-clippy == 'true' || inputs.run-fmt == 'true' || inputs.run-test == 'true'
       shell: bash
       env:
         RUN_CLIPPY: ${{ inputs.run-clippy }}
         RUN_FMT: ${{ inputs.run-fmt }}
+        RUN_TEST: ${{ inputs.run-test }}
         CLIPPY_OUTCOME: ${{ steps.clippy.outcome }}
         FMT_OUTCOME: ${{ steps.fmt.outcome }}
+        TEST_OUTCOME: ${{ steps.test.outcome }}
       run: |
         row() {
           local enabled="$1" outcome="$2" label="$3"
@@ -183,12 +202,13 @@ runs:
           fi
         }
         {
-          echo "## setup-rust clippy/fmt gate"
+          echo "## setup-rust clippy/fmt/test gate"
           echo "| Check | Result |"
           echo "| --- | --- |"
         } >> "$GITHUB_STEP_SUMMARY"
         row "$RUN_CLIPPY" "$CLIPPY_OUTCOME" "cargo clippy"
         row "$RUN_FMT" "$FMT_OUTCOME" "cargo fmt --all -- --check"
+        row "$RUN_TEST" "$TEST_OUTCOME" "cargo test --locked --all-targets"
 
         failed=0
         if [ "$CLIPPY_OUTCOME" = "failure" ]; then
@@ -197,6 +217,10 @@ runs:
         fi
         if [ "$FMT_OUTCOME" = "failure" ]; then
           echo "::error::cargo fmt --all -- --check found unformatted files — see the cargo fmt step above" >&2
+          failed=1
+        fi
+        if [ "$TEST_OUTCOME" = "failure" ]; then
+          echo "::error::cargo test --locked --all-targets failed — see the cargo test step above" >&2
           failed=1
         fi
         exit "$failed"
