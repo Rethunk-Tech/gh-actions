@@ -102,12 +102,25 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
 
+    - name: Resolve Bun version file
+      id: bun-version-source
+      shell: bash
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        BUN_VERSION: ${{ inputs.bun-version }}
+      run: |
+        if [ -z "$BUN_VERSION" ] && [ -f "$WORKING_DIRECTORY/package.json" ]; then
+          echo "path=$WORKING_DIRECTORY/package.json" >> "$GITHUB_OUTPUT"
+        else
+          echo "path=" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Setup Bun
       id: setup-bun
       uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
       with:
         bun-version: ${{ inputs.bun-version }}
-        bun-version-file: ${{ inputs.bun-version == '' && format('{0}/package.json', inputs.working-directory) || '' }}
+        bun-version-file: ${{ steps.bun-version-source.outputs.path }}
 
     - name: Verify lockfile exists, resolve Next app + cache dirs
       shell: bash

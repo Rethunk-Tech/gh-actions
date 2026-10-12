@@ -14,6 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 ACTIONS = ("setup-bun", "setup-nextjs-bun")
 WATCHED = (
+    "Resolve Bun version file",
     "Setup Bun",
     "Cache Bun install store",
     "Resolve Playwright version",
@@ -21,7 +22,6 @@ WATCHED = (
     "Install Playwright",
     "Install Playwright system deps",
 )
-SKIP_INSTALL_CLAUSE = "inputs.skip-install != 'true' && "
 LOCKFILE_IF = "steps.lockfile.outputs.present == 'true'"
 PACKAGE_JSON_GUARD = (
     "if [ -f package.json ]; then",
@@ -33,7 +33,6 @@ BLOCK_MARKS = ("|", "|-", ">", ">-")
 
 # Fields handled below, so the generic compare does not also flag them.
 SPECIAL = {
-    ("Setup Bun", "with.bun-version-file"),
     ("Cache Bun install store", "if"),
     ("Resolve Playwright version", "run"),
 }
@@ -173,36 +172,6 @@ def norm_run(script: str) -> list[str]:
     return [line.strip() for line in script.splitlines() if line.strip()]
 
 
-def check_version_file(
-    left: dict[str, str], right: dict[str, str], errors: list[str]
-) -> None:
-    bun = left.get("with.bun-version-file")
-    nxt = right.get("with.bun-version-file")
-    if bun is None or nxt is None:
-        errors.append("Setup Bun is missing with.bun-version-file")
-        return
-    if SKIP_INSTALL_CLAUSE in nxt:
-        errors.append(
-            "setup-nextjs-bun bun-version-file references skip-install, which it does not have"
-        )
-        return
-    if SKIP_INSTALL_CLAUSE not in bun:
-        if bun == nxt:
-            errors.append(
-                "Setup Bun with.bun-version-file matches; remove the skip-install exception"
-            )
-        else:
-            errors.append(
-                "Setup Bun with.bun-version-file diverged and the skip-install clause is gone"
-            )
-        return
-    if bun.replace(SKIP_INSTALL_CLAUSE, "", 1) != nxt:
-        errors.append(
-            "Setup Bun with.bun-version-file differs by more than the skip-install clause\n"
-            f"  setup-bun: {bun}\n  setup-nextjs-bun: {nxt}"
-        )
-
-
 def check_cache_if(
     left: dict[str, str], right: dict[str, str], errors: list[str]
 ) -> None:
@@ -277,7 +246,6 @@ def compare(parsed: dict[str, dict[str, dict[str, object]]]) -> list[str]:
         return errors
 
     pairs = (
-        ("Setup Bun", check_version_file),
         ("Cache Bun install store", check_cache_if),
         ("Resolve Playwright version", check_playwright_run),
     )
