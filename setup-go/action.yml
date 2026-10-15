@@ -198,10 +198,10 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.SETUP_GO_MOD_CACHE }}
-        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-mod-${{ github.job }}
+        key: setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-${{ github.job }}
         restore-keys: |
-          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-mod-
-          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-mod-
+          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-
+          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
 
     # Go's own trim only drops entries unused for five days, so each dependency change stacks
     # a new build generation on the restored one until the runner's disk fills. Go bumps an
