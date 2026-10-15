@@ -61,22 +61,12 @@ inputs:
       steps — no caller lints and format-checks different trees.
     required: false
     default: "."
-  ruff-args:
-    description: Extra args for `ruff check` only (e.g. --select, --exclude).
-    required: false
-    default: ""
   run-audit:
     description: >
       When true, runs `uv audit` after the sync. Turns this action into a job gate for callers
       who opt in — off by default.
     required: false
     default: "false"
-  audit-args:
-    description: >
-      Args for `uv audit`. `--locked` audits uv.lock rather than the installed environment, so a
-      pinned-but-uninstalled extra carrying an advisory still fails.
-    required: false
-    default: "--locked"
   run-test:
     description: >
       When true, runs `uv run pytest` from working-directory after the sync. Separate from
@@ -154,12 +144,11 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
-        RUFF_ARGS: ${{ inputs.ruff-args }}
         RUFF_PATHS: ${{ inputs.ruff-paths }}
       run: |
-        # Both may hold multiple space-separated tokens; word-splitting is intentional.
+        # RUFF_PATHS may hold multiple space-separated paths; word-splitting is intentional.
         # shellcheck disable=SC2086
-        uv run ruff check $RUFF_ARGS $RUFF_PATHS
+        uv run ruff check $RUFF_PATHS
 
     - name: ruff format --check
       id: ruff-format
@@ -180,16 +169,7 @@ runs:
       continue-on-error: true
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      env:
-        AUDIT_ARGS: ${{ inputs.audit-args }}
-      run: |
-        if [ -n "$AUDIT_ARGS" ]; then
-          # AUDIT_ARGS may hold multiple space-separated flags; word-splitting is intentional.
-          # shellcheck disable=SC2086
-          uv audit $AUDIT_ARGS
-        else
-          uv audit
-        fi
+      run: uv audit --locked
 
     - name: pytest
       id: test

@@ -231,14 +231,13 @@ than one still surfaces every finding even if an earlier one fails:
     install-args: --locked --group dev
     run-ruff: "true"
     # ruff-paths: "bench/ tests/"     # default: .   (shared by both ruff steps)
-    # ruff-args: --select=E,F          # extra flags for `ruff check` only
     run-ruff-format: "true"            # separate input: most callers lint without enforcing
                                        # ruff's formatter, and one input for both would fail
                                        # every repo that has only ever run `ruff check`
     run-audit: "true"
-    # audit-args: --locked             # default; audits uv.lock, so a pinned-but-uninstalled
-    #                                  # extra carrying an advisory still fails
 ```
+
+`run-audit` runs `uv audit --locked` (audits uv.lock, so a pinned-but-uninstalled extra carrying an advisory still fails).
 
 `uv audit` is still marked experimental upstream and may change without warning — that is why
 `run-audit` is opt-in rather than on by default.
