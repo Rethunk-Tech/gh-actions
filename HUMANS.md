@@ -137,6 +137,7 @@ plain suite.
     go-version-file: go.mod          # default; may point into a subdir, e.g. backend/go.mod
     # go-version: "1.26.5"           # exact version instead — overrides go-version-file
     # cache-dependency-path: "**/go.sum"  # default: the go.sum next to go-version-file, plus go-version-file
+    # cache-build: "false"
 ```
 
 Outputs: `go-version`, `cache-hit` (an exact key match for this job), and `test-outcome`, `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
@@ -145,6 +146,8 @@ The cache key is Go version + dependency hash + job id, so a job with `run-test-
 a lint-only job each restore the build cache they filled themselves — a lint job's cache is never
 the race-test cache. A job's first run, or a dependency bump, falls back to the newest cache any
 job saved for the same Go version. Matrix legs share one job id and therefore one cache entry.
+
+`cache-build` defaults to true. Set it to `"false"` to store the module cache only (no build cache, no prune).
 
 **Test gate** — set `run-test` to `"true"` in the job that owns the module's plain test gate.
 It runs `go test ./...` from the directory named by `go-version-file` (or the matching

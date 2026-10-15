@@ -1,6 +1,7 @@
 name: Setup Go
 description: >
-  Install a Go toolchain via actions/setup-go and cache its module and build caches per job.
+  Install a Go toolchain via actions/setup-go and cache its module and build caches per job
+  (cache-build false stores modules only).
   Optionally also run `go test ./...`, the race-enabled test suite, golangci-lint,
   golangci-lint fmt, and/or govulncheck as gates on the same job — opt-in, off by default.
   Writes a pass/fail table to the job's step summary.
@@ -27,6 +28,12 @@ inputs:
       Leave empty to default to the go.sum next to go-version-file plus go-version-file itself.
     required: false
     default: ""
+  cache-build:
+    description: >
+      When false, cache the module download cache only and skip the build-cache prune. A job
+      that never compiles sets this false. Default true keeps the module and build caches.
+    required: false
+    default: "true"
   run-test-race:
     description: >
       When true, runs `go test -race ./...` from the module directory after the toolchain is set
@@ -90,7 +97,7 @@ outputs:
     value: ${{ steps.setup-go.outputs.go-version }}
   cache-hit:
     description: Whether the module/build cache was restored from an exact key match for this job.
-    value: ${{ steps.go-cache.outputs.cache-hit }}
+    value: ${{ steps.go-cache.outputs.cache-hit || steps.go-mod-cache.outputs.cache-hit }}
   test-race-outcome:
     description: Outcome of the `go test -race` gate (success, failure or skipped when run-test-race is off).
     value: ${{ steps.test-race.outcome }}
@@ -174,6 +181,7 @@ runs:
     # what that fallback carries forward.
     - name: Cache Go modules and build cache
       id: go-cache
+      if: inputs.cache-build != 'false'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
@@ -184,6 +192,17 @@ runs:
           setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-
           setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
 
+    - name: Cache Go modules
+      id: go-mod-cache
+      if: inputs.cache-build == 'false'
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ env.SETUP_GO_MOD_CACHE }}
+        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-mod-${{ github.job }}
+        restore-keys: |
+          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-mod-
+          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-mod-
+
     # Go's own trim only drops entries unused for five days, so each dependency change stacks
     # a new build generation on the restored one until the runner's disk fills. Go bumps an
     # entry's mtime when a build uses it and the mtime is over an hour old, so the entries the
@@ -191,7 +210,7 @@ runs:
     # drop the rest. A job over an hour long can lose some of its own entries, which costs a
     # rebuild of them, not correctness.
     - name: Prune build cache to the saving job's working set
-      if: runner.os == 'Linux'
+      if: inputs.cache-build != 'false' && runner.os == 'Linux'
       shell: bash
       run: |
         [ -d "$SETUP_GO_BUILD_CACHE" ] || exit 0
