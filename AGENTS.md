@@ -68,6 +68,14 @@ hand-rolled sites across 10 workflows in 6 repos, split across four incompatible
 (`enable-cache` present vs absent, uv version pinned vs floating, and Python selected three
 different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `uv python install`).
 
+### Recount
+
+Next work is a read-only fleet recount of hand-rolled CI steps. A new composite action is
+built only when a candidate clears the same bar `setup-python` cleared: many sites across
+repos, incompatible variants. The historical bar in the paragraph above is 15 hand-rolled
+setup sites across 10 workflows in 6 repos, split across four incompatible variants. That
+recount must be re-done rather than trusting those counts.
+
 ## Conventions every action here follows
 
 - **No `actions/checkout`.** The caller does that first, before the `uses:` line — standard
