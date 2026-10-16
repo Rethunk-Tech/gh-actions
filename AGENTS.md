@@ -72,9 +72,8 @@ different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `u
 
 Next work is a read-only fleet recount of hand-rolled CI steps. A new composite action is
 built only when a candidate clears the same bar `setup-python` cleared: many sites across
-repos, incompatible variants. The historical bar in the paragraph above is 15 hand-rolled
-setup sites across 10 workflows in 6 repos, split across four incompatible variants. That
-recount must be re-done rather than trusting those counts.
+repos, incompatible variants. That recount happens before any new action, rather than
+trusting the counts already written above.
 
 ## Conventions every action here follows
 
