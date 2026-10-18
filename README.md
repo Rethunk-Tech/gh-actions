@@ -19,7 +19,7 @@ drifting independently per repo across the fleet.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.16
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.17
   with:
     working-directory: frontend
 ```
