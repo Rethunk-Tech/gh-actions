@@ -63,7 +63,7 @@ inputs:
     default: "."
   run-audit:
     description: >
-      When true, runs `uv audit` after the sync. Turns this action into a job gate for callers
+      When true, runs `uv audit --locked` after the sync. Turns this action into a job gate for callers
       who opt in — off by default.
     required: false
     default: "false"
