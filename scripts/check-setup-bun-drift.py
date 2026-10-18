@@ -30,7 +30,7 @@ PACKAGE_JSON_GUARD = (
     "version=unpinned",
     "fi",
 )
-BLOCK_MARKS = ("|", "|-", ">", ">-")
+BLOCK_MARKS = ("|",)
 
 # Fields handled below, so the generic compare does not also flag them.
 SPECIAL = {
