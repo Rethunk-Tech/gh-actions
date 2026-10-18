@@ -192,6 +192,12 @@ runs:
       working-directory: ${{ inputs.playwright-directory != '' && inputs.playwright-directory || inputs.working-directory }}
       run: |
         version=$(bun --print "const p=require('./package.json'); (p.devDependencies&&p.devDependencies['@playwright/test'])||(p.dependencies&&p.dependencies['@playwright/test'])||(p.devDependencies&&p.devDependencies.playwright)||(p.dependencies&&p.dependencies.playwright)||'unpinned'" 2>/dev/null || echo unpinned)
+        case "$version" in
+          *$'\n'*|*$'\r'*)
+            echo "::error::Playwright version from package.json contains a newline" >&2
+            exit 1
+            ;;
+        esac
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Cache Playwright browsers

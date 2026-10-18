@@ -292,6 +292,12 @@ runs:
         else
           version=unpinned
         fi
+        case "$version" in
+          *$'\n'*|*$'\r'*)
+            echo "::error::Playwright version from package.json contains a newline" >&2
+            exit 1
+            ;;
+        esac
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Cache Playwright browsers
