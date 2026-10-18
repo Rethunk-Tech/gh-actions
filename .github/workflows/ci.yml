@@ -81,7 +81,7 @@ jobs:
         env:
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
         run: |
-          curl -fsSL -o actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
+          curl -fsSL --max-time 60 --retry 5 --retry-all-errors -o actionlint.tar.gz "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz"
           echo "$ACTIONLINT_SHA256  actionlint.tar.gz" | sha256sum -c -
           tar xz -f actionlint.tar.gz actionlint
 
