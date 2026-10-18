@@ -253,6 +253,30 @@ jobs:
             exit 1
           fi
 
+  # One-sided extra-cache used to skip the cache step with no error. The composite must fail
+  # and name both inputs — a caller that forgets the key is not caching.
+  test-setup-bun-extra-cache-paths-only-fail:
+    name: setup-bun self-test (extra-cache paths without key fails)
+    needs: test-setup-bun-cold
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app
+          extra-cache-paths: .turbo-selftest
+      - name: assert one-sided extra-cache failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::expected extra-cache-paths without extra-cache-key to fail the composite, got '$OUTCOME'" >&2
+            exit 1
+          fi
+
   # skip-install must skip the install, not the install-store cache: its documented
   # callers run `bun install` themselves after some other setup step and still want the
   # cache. Chained off the warm job so the key is known to exist — before the fix this

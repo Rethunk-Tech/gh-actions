@@ -44,7 +44,8 @@ snapshots of CJK or Thai text in CI should install those fonts itself. Combined 
 
 **Caching a build directory too** — a path the repo owns that should not be keyed on the
 lockfile, such as a Turborepo `.turbo`. `extra-cache-paths` and `extra-cache-key` are both
-required for the cache to run at all (`extra-cache-restore-key-fragment` is optional). Paths
+required for the cache to run at all; setting exactly one fails the job with an
+error that names both (`extra-cache-restore-key-fragment` is optional). Paths
 use `actions/cache` `path` form (newline-separated for more than one). Leaving the restore
 fragment empty restores from any previous extra cache for this OS, which is what a SHA-keyed
 cache wants because its key never repeats:

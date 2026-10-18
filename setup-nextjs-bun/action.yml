@@ -58,9 +58,9 @@ inputs:
   extra-cache-paths:
     description: >
       Additional paths to cache beyond Bun's install store, in actions/cache `path` form
-      (newline-separated for more than one). Caching is skipped unless extra-cache-key is
-      also set. For build caches a repo owns but does not want to key on its lockfile —
-      a Turborepo .turbo directory, say.
+      (newline-separated for more than one). extra-cache-key must be set too — setting
+      exactly one of the two fails the job. For build caches a repo owns but does not
+      want to key on its lockfile — a Turborepo .turbo directory, say.
     required: false
     default: ""
   extra-cache-key:
@@ -167,6 +167,13 @@ runs:
         key: ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-${{ env.NEXT_SRC_HASH }}
         restore-keys: |
           ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-
+
+    - name: Require extra-cache paths and key together
+      if: (inputs.extra-cache-paths != '' && inputs.extra-cache-key == '') || (inputs.extra-cache-paths == '' && inputs.extra-cache-key != '')
+      shell: bash
+      run: |
+        echo "::error::extra-cache-paths and extra-cache-key must both be set, or both left empty" >&2
+        exit 1
 
     - name: Cache extra paths
       if: inputs.extra-cache-paths != '' && inputs.extra-cache-key != ''

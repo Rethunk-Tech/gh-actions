@@ -49,7 +49,7 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   `@playwright/test` version, matching Playwright's own documented CI caching guide.
 - `extra-cache-paths` (`setup-bun` and `setup-nextjs-bun`) caches a build directory the repo
   owns alongside the install store, on a caller-supplied key — for a Turborepo `.turbo` or
-  similar.
+  similar. Setting only one of `extra-cache-paths` / `extra-cache-key` fails the job.
 - Every wrapped dependency is SHA-pinned with a version comment; the repo-ops
   actions-refresh-sha sweep keeps pins current fleet-wide.
 - Actually tested, not just schema-checked: each action runs end-to-end via `act` before a
