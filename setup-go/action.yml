@@ -98,6 +98,11 @@ outputs:
   cache-hit:
     description: Whether the module/build cache was restored from an exact key match for this job.
     value: ${{ steps.go-cache.outputs.cache-hit || steps.go-mod-cache.outputs.cache-hit }}
+  cache-mode:
+    description: >
+      `build` when the module and build caches are stored (the default), or `modules` when
+      cache-build is false and only the module cache is stored.
+    value: ${{ inputs.cache-build == 'false' && 'modules' || 'build' }}
   test-race-outcome:
     description: Outcome of the `go test -race` gate (success, failure or skipped when run-test-race is off).
     value: ${{ steps.test-race.outcome }}

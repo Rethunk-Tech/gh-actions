@@ -174,58 +174,6 @@ Rejected: turning it on by default. Every other security gate here is opt-in.
 - `HUMANS.md` documents the input next to clippy/fmt/test. `gate` stays
   clean.
 
-## cache-build has no self-test
-
-`setup-go`'s `cache-build` input (`setup-go/action.yml:31`, default `"true"`)
-switches between the full module+build cache (`:182`) and a modules-only
-cache (`:195`). No job in `.github/workflows/ci.yml` sets
-`cache-build: "false"`. A regression that ignores the input still passes
-every self-test, because they all take the default.
-
-Decided shape: one job on `go-app` with `cache-build: "false"` that asserts
-the composite succeeded, then checks the modules-only cache path was the
-one `actions/cache` used (the `go-mod-cache` step ran and `go-cache` did
-not — via step outcomes, not by poking `GOCACHE` on disk). No second
-cold/warm pair: the existing cold/warm jobs keep covering the default.
-
-Rejected: asserting `GOCACHE` is empty. The Go toolchain still writes a
-local build cache; `cache-build: false` only skips *saving* it.
-Rejected: changing the default.
-
-### Read
-
-1. `setup-go/action.yml:31` — the input.
-2. `setup-go/action.yml:182` `Cache Go modules and build cache` (`id:
-   go-cache`) and `:195` `Cache Go modules` (`id: go-mod-cache`).
-3. `HUMANS.md` cache-build sentence — keep it; this is a test, not a
-   behaviour change.
-4. `.github/workflows/ci.yml` setup-go cold/warm jobs — do not collapse
-   them into this job.
-
-### Traps
-
-- **Step outcomes on a skipped cache step are `skipped`, not `failure`.**
-  Assert `go-cache` is skipped and `go-mod-cache` is success. The composite
-  does not currently expose those as action outputs, so the assertion has
-  to live inside the action (a new output) or by inspecting
-  `${{ steps.* }}` from a wrapper. Adding an output is a new public name:
-  only do it if the job cannot see the inner steps (it cannot — they are
-  inside the composite). So the test is a small `run:` after the action
-  that cannot see inner steps.
-- **Inner steps are invisible to the caller.** The honest test is an
-  output, e.g. `cache-mode: build|modules`, defaulting to today's
-  `build` when `cache-build` is not `"false"`. That is a new output; ship
-  it with the job in one commit, documented in `HUMANS.md`.
-- **Two `actions/cache` steps with overlapping paths in one job will
-  confuse save.** The action already branches so only one runs.
-
-### Acceptance
-
-- A job with `cache-build: "false"` reports the modules-only mode (via the
-  new output or an equivalent the caller can read) and succeeds.
-- Default callers still report build-cache mode and still warm-hit on the
-  existing pair. `gate` stays clean.
-
 ## extra-cache with only one of paths or key set is a silent no-op
 
 `setup-bun/action.yml:199` (and the duplicate at

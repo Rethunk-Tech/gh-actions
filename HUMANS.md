@@ -147,7 +147,7 @@ plain suite.
     # cache-build: "false"
 ```
 
-Outputs: `go-version`, `cache-hit` (an exact key match for this job), and `test-outcome`, `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
+Outputs: `go-version`, `cache-hit` (an exact key match for this job), `cache-mode` (`build` when the module and build caches are stored, `modules` when `cache-build` is `"false"`), and `test-outcome`, `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
 
 The cache key is Go version + dependency hash + job id, so a job with `run-test-race` enabled and
 a lint-only job each restore the build cache they filled themselves — a lint job's cache is never
