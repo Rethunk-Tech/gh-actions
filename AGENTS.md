@@ -242,11 +242,12 @@ from a live URL has no equivalent pin.
 ## Gate budget
 
 Measured at load average 27 to 30 on 32 cores, so judge on CPU. `gate` runs actionlint over the
-workflows and, for each of the eight test fixtures under `.github/test-fixtures/` that CI builds, the
+workflows and, for each of the twelve test fixtures `gate --list` runs under `.github/test-fixtures/`
+(`rust-app-broken` and `rust-app-unformatted` included), the
 fixture's own checks (biome for the JS ones; build, golangci-lint, test and govulncheck chained in
 one command for `go-app`, so the Go steps share one compile). The CI jobs that exercise the composite
 actions themselves need a GitHub runner and are not reproducible locally. Warm: 1.2 to 2.2 s wall,
 5 CPU-s. Cold (fresh `GOCACHE`, `XDG_CACHE_HOME` and golangci-lint cache): 4.8 s wall, 28 CPU-s, the
 `go-app` chain being the slowest step. No oversubscription and no duplicated steps.
 
-`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing) and `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`). It also lists the fixtures that are broken on purpose (`go-app-failing`, `python-app-broken`, `python-app-failing`, `python-app-unformatted`, `rust-app-failing`, `bun-app-failing`) under `[detect] exclude`, because gate gates every directory CI names and those fail by design. Warm with v0.6.5: 1.1 s wall, 4.7 CPU-s.
+`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing), `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`), and the lint job's action.yml schema, undeclared-input, and tracked-fixture checks. It also lists the fixtures that are broken on purpose (`python-app-broken`, `python-app-failing`, `python-app-unformatted`, `rust-app-failing`, `bun-app-failing`) under `[detect] exclude`, because gate gates every directory CI names via `working-directory` and those fail by design. `go-app-failing` is also excluded: CI only passes it as `go-version-file`, so detection does not pick it up as a working-directory the way it does those others. Warm with v0.6.5: 1.1 s wall, 4.7 CPU-s.
