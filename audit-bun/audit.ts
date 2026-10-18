@@ -1,6 +1,6 @@
 // Fails only on advisories whose fix has shipped; the rest warn with the dependency chain.
 
-export interface Advisory {
+interface Advisory {
 	id: number;
 	url: string;
 	title: string;
@@ -11,7 +11,7 @@ export interface Advisory {
 /** `bun audit --json`: advisories by package name. */
 export type Report = Record<string, Advisory[]>;
 
-export interface Finding {
+interface Finding {
 	pkg: string;
 	advisory: Advisory;
 	latest: string | undefined;
@@ -62,15 +62,12 @@ export const annotation = (
 ): string =>
 	`::${level}::${message.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A")}`;
 
-function registryLatestUrl(pkg: string): string {
-	return `https://registry.npmjs.org/${pkg.replaceAll("/", "%2F")}/latest`;
-}
-
 export async function latestVersion(pkg: string): Promise<string | undefined> {
 	try {
-		const res = await fetch(registryLatestUrl(pkg), {
-			signal: AbortSignal.timeout(10_000),
-		});
+		const res = await fetch(
+			`https://registry.npmjs.org/${pkg.replaceAll("/", "%2F")}/latest`,
+			{ signal: AbortSignal.timeout(10_000) },
+		);
 		if (!res.ok) {
 			return undefined;
 		}
