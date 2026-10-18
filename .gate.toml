@@ -6,6 +6,48 @@ run = "bun test audit-bun"
 [gates.setup-bun-drift]
 run = "python3 scripts/check-setup-bun-drift.py"
 
+# Same three lint-job checks as .github/workflows/ci.yml. Detection never sees them.
+[gates.action-yml-schema]
+run = '''
+bash -s <<'EOF'
+shopt -s nullglob
+files=(*/action.yml)
+if [ ${#files[@]} -eq 0 ]; then
+  echo "::error::no action.yml files found at */action.yml" >&2
+  exit 1
+fi
+uvx check-jsonschema --builtin-schema vendor.github-actions "${files[@]}"
+EOF
+'''
+
+[gates.declared-inputs]
+run = '''
+python3 - <<'PY'
+import re, sys, pathlib
+bad = False
+for f in sorted(pathlib.Path(".").glob("*/action.yml")):
+    t = f.read_text()
+    m = re.search(r"^inputs:\n(.*?)^(?=\w)", t, re.S | re.M)
+    declared = set(re.findall(r"^  ([\w-]+):", m.group(1), re.M)) if m else set()
+    for name in sorted(set(re.findall(r"inputs\.([\w-]+)", t)) - declared):
+        print(f"::error file={f}::references undeclared input '{name}'")
+        bad = True
+sys.exit(1 if bad else 0)
+PY
+'''
+
+[gates.fixtures-tracked]
+run = '''
+bad=0
+for d in .github/test-fixtures/*/; do
+  if [ -z "$(git ls-files "$d")" ]; then
+    echo "::error file=.gitignore::fixture '$d' has no tracked files — it is gitignored, so CI will never see it" >&2
+    bad=1
+  fi
+done
+exit "$bad"
+'''
+
 # CI asserts the shared actions fail on these fixtures, so they are broken on purpose and gate leaves them out.
 [detect]
 exclude = [
