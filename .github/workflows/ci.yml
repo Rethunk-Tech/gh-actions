@@ -27,6 +27,7 @@ jobs:
       # composite action.yml (throws bogus structural errors). Schema-validate those
       # separately; actionlint below is scoped to .github/workflows/*.yml only.
       - name: Schema-validate action.yml files
+        if: ${{ !cancelled() }}
         run: |
           # Glob, not a hardcoded list: a new action directory that never gets added here
           # would otherwise ship schema-invalid. The undeclared-input check below already globs.
@@ -42,6 +43,7 @@ jobs:
       # the empty string rather than erroring, so a step gated on one silently never runs.
       # That shipped once, in setup-bun's extra-paths cache.
       - name: Check every referenced input is declared
+        if: ${{ !cancelled() }}
         run: |
           python3 - <<'EOF'
           import re, sys, pathlib
@@ -59,6 +61,7 @@ jobs:
       # setup-nextjs-bun duplicates setup-bun's shared steps instead of composing them
       # (actions/runner#2009). Fail when those steps diverge without an exception in the script.
       - name: Check setup-bun and setup-nextjs-bun shared steps
+        if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s scripts -p 'test_*.py' -v && python3 scripts/check-setup-bun-drift.py
 
       # A fixture directory silently excluded by .gitignore never reaches CI's checkout, so the
@@ -67,6 +70,7 @@ jobs:
       # *-broken fixture directories themselves, not just the compiled binaries it was written
       # for, and only an act run surfaced it. Untracked fixture, tracked failure.
       - name: Check every test fixture is actually tracked
+        if: ${{ !cancelled() }}
         run: |
           bad=0
           for d in .github/test-fixtures/*/; do
@@ -78,6 +82,7 @@ jobs:
           exit "$bad"
 
       - name: Install actionlint
+        if: ${{ !cancelled() }}
         env:
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
         run: |
@@ -86,6 +91,7 @@ jobs:
           tar xz -f actionlint.tar.gz actionlint
 
       - name: Lint workflows
+        if: ${{ !cancelled() }}
         run: ./actionlint .github/workflows/*.yml
 
   # actions/cache persists ACROSS separate workflow runs on the same ref (GitHub's real cache
@@ -685,6 +691,28 @@ jobs:
           fi
           if [ "$PHASE" = "warm" ] && [ "$CACHE_HIT" != "true" ]; then
             echo "::error::expected cache-hit=true on warm run, got '$CACHE_HIT'" >&2
+            exit 1
+          fi
+
+  # A wrong working-directory used to share one empty hashFiles() cache key with every other
+  # missing-lockfile caller. Fail closed, matching setup-bun's missing bun.lock.
+  test-setup-rust-no-lockfile:
+    name: setup-rust self-test (missing Cargo.lock fails)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        uses: ./setup-rust
+        continue-on-error: true
+        with:
+          working-directory: .github
+      - name: assert a missing Cargo.lock fails the action
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "::error::expected setup-rust to fail without Cargo.lock, got '$OUTCOME'" >&2
             exit 1
           fi
 
