@@ -136,7 +136,7 @@ runs:
         # Resolved here (not inlined as inputs.*/env.* expressions in the cache steps below)
         # so a consumer that nests this action inside their own local composite doesn't hit
         # the actions/cache post-step context bug for local composite nesting
-        # (actions/runner#2009, #2030) — see repo README. Falls back to working-directory
+        # (actions/runner#2009, #2030) — see AGENTS.md. Falls back to working-directory
         # when next-app-directory is unset (the single-app case, e.g. no Bun workspace).
         NEXT_APP_DIR="${NEXT_APP_DIRECTORY_INPUT:-$WORKING_DIRECTORY}"
         echo "NEXT_APP_DIR=${NEXT_APP_DIR}" >> "$GITHUB_ENV"
