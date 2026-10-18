@@ -2,47 +2,20 @@
 
 ## Supported versions
 
-The latest tagged release. This repo has no long-lived release branches, so a fix ships in
-the next tag rather than being backported.
+The latest tagged release. No long-lived branches; a fix ships in the next tag.
 
-## Reporting a vulnerability
+## Reporting
 
-Use GitHub's **private vulnerability reporting** on this repository (Security → Report a
-vulnerability). It stays private until a fix ships.
+GitHub **private vulnerability reporting** (Security → Report a vulnerability). Do not open a public issue first.
 
-Please do not open a public issue for a suspected vulnerability first.
+## In scope
 
-## What is in scope
+- A `run:` step that interpolates a workflow input, PR title/branch, or similar into a shell as anything but an inert argument (inline `${{ }}`). Inputs must enter via `env:`.
+- A wrapped-action SHA pin whose content does not match the version comment (tamper in a PR here). Upstream compromise of a wrapped action is out of scope.
+- A cache key that would serve one consumer's cache to an unrelated repo/branch. GitHub scopes the cache; this repo is responsible for key construction.
 
-These actions run inside a caller's workflow with whatever permissions that workflow has, so
-the interesting failures are ones where an action does something the caller's inputs didn't
-ask for:
+## Out of scope
 
-- Any `run:` step that would let a value from a workflow input, an untrusted PR title/branch
-  name, or similar reach a shell as anything other than an inert argument — script injection
-  via unquoted or inline `${{ }}` interpolation. Every input this repo's actions consume goes
-  in via `env:` first; a step that regresses to inline interpolation is a bug even if no
-  concrete exploit is demonstrated.
-- A wrapped third-party action's SHA pin resolving to different content than the version
-  comment claims (i.e. the pin itself was tampered with in a PR, not that the upstream project
-  was compromised — that's out of scope, see below).
-- A cache key collision that would let one consumer's cached content be served to an unrelated
-  consumer's job under a different repo/branch (GitHub's own cache scoping is the primary
-  defense here; this repo's actions' contribution is only whether the *key* is constructed
-  correctly).
-
-## What is not
-
-- **The wrapped third-party actions' own supply chain** (`oven-sh/setup-bun`,
-  `astral-sh/setup-uv`, `actions/setup-node`, `actions/cache`). This repo SHA-pins each one specifically so a
-  compromise upstream requires a new, reviewed pin bump here before it reaches any consumer —
-  but a vulnerability in the upstream project itself is that project's to fix and disclose,
-  not this repo's.
-- **A caller passing genuinely untrusted, attacker-controlled input directly into `install-args`
-  or `extra-cache-key`** without their own sanitization. These inputs are designed for a
-  repo's own CI configuration (flags, hash expressions), not for values sourced from PR
-  content — a caller wiring one to something an outside contributor controls is a
-  caller-side design choice, not a vulnerability in the action itself.
-- **A cache serving stale content within its own correctly-scoped key.** That's a correctness/
-  performance bug (a degenerate `hashFiles()` result, a missing `restore-keys` prefix) —
-  please file it as an ordinary issue, not a security report.
+- Vulnerabilities in wrapped actions (`oven-sh/setup-bun`, `astral-sh/setup-uv`, `actions/setup-node`, `actions/cache`). Pins here stop an upstream compromise until a reviewed bump; disclose upstream.
+- A caller feeding attacker-controlled PR content into `install-args` or `extra-cache-key`. Those are for the caller's own CI flags and hashes.
+- Stale cache under a correctly-scoped key. File as an ordinary issue.
