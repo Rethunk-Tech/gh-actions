@@ -93,7 +93,9 @@ unset.
 
 ### `setup-nextjs-bun`
 
-Everything `setup-bun` does, plus a `.next/cache` build cache and `NEXT_TELEMETRY_DISABLED=1`.
+Installs Bun, restores its install-store cache, restores Next.js's `.next/cache` build cache,
+and sets `NEXT_TELEMETRY_DISABLED=1`. It does not accept `setup-bun`'s `skip-install`,
+`install-args`, `run-audit`, or `run-test` — undeclared `with:` keys are ignored.
 One Next.js app per call — for a repo with multiple Next apps, call this once per app instead.
 
 ```yaml
@@ -101,7 +103,7 @@ One Next.js app per call — for a repo with multiple Next apps, call this once 
 - uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.14
   with:
     working-directory: frontend
-    # same optional inputs as setup-bun: bun-version, node-version, install-playwright,
+    # bun-version, node-version, next-app-directory, install-playwright,
     # playwright-browsers, playwright-directory, extra-cache-paths, extra-cache-key,
     # extra-cache-restore-key-fragment
 ```
@@ -349,7 +351,7 @@ Convenience examples here use the current point-release (`@v1.14`). Fleet call s
 commit SHA with a version comment, matching how these actions pin their own dependencies:
 
 ```yaml
-uses: Rethunk-Tech/gh-actions/setup-bun@<sha> # v1.11
+uses: Rethunk-Tech/gh-actions/setup-bun@<sha> # v1.14
 ```
 
 Check [the releases page](https://github.com/Rethunk-Tech/gh-actions/releases) for the current
