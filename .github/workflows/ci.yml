@@ -1300,6 +1300,31 @@ jobs:
             exit 1
           fi
 
+  # Proves the run-audit gate fires: jinja2 3.1.3 has shipped fixes, so uv audit --locked fails.
+  test-setup-python-audit-fail:
+    name: setup-python self-test (audit gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-python
+        with:
+          working-directory: .github/test-fixtures/python-app-vulnerable
+          run-audit: "true"
+      - name: assert the audit gate failed
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
+          RUFF: ${{ steps.setup.outputs.ruff-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$AUDIT" != "failure" ] || [ "$RUFF" != "skipped" ]; then
+            echo "::error::expected the audit gate to fail on a fixable advisory, got composite '$OUTCOME', audit '$AUDIT', ruff '$RUFF'" >&2
+            exit 1
+          fi
+
   # The project-less case: uv as a PATH tool for `uvx <tool>`, no uv.lock or pyproject anywhere.
   # Must not error on the empty cache (ignore-nothing-to-cache) or try to sync — this repo's own
   # lint job above calls exactly this shape.
@@ -1316,17 +1341,29 @@ jobs:
       - run: uv --version
 
   # repo-ops' audit job: skip-install + run-audit, because uv audit --locked reads uv.lock
-  # rather than the synced environment. Without this, a regression that gates audit behind
-  # sync would silently no-op that caller (schema validation cannot see a step `if:`).
+  # rather than the synced environment. The vulnerable fixture is the assertion that the
+  # audit step actually ran: a skipped step's outcome is not "failure", and the gate
+  # treats a skipped outcome as pass, so a clean fixture would still go green.
   test-setup-python-skip-install-audit:
     name: setup-python self-test (skip-install still audits)
-    needs: test-setup-python-cold
+    needs: reset-self-test-caches
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: ./setup-python
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-python
         with:
-          working-directory: .github/test-fixtures/python-app
+          working-directory: .github/test-fixtures/python-app-vulnerable
           skip-install: "true"
           run-audit: "true"
+      - name: assert skip-install still failed the audit gate
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$AUDIT" != "failure" ]; then
+            echo "::error::skip-install gated or skipped uv audit; expected composite failure and audit-outcome=failure, got composite '$OUTCOME', audit '$AUDIT'" >&2
+            exit 1
+          fi

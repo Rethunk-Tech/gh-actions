@@ -1,0 +1,11 @@
+[project]
+name = "python-app-vulnerable-fixture"
+version = "0.0.0"
+description = "Fixture with a known advisory whose fix has shipped, proving setup-python's audit gate fires."
+requires-python = ">=3.12"
+dependencies = ["jinja2==3.1.3"]
+
+# A fixture is never installed as a package — this keeps `uv sync` to just the
+# dependencies, with no build backend to configure or keep working.
+[tool.uv]
+package = false
