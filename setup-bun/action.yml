@@ -145,6 +145,8 @@ runs:
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
         BUN_VERSION: ${{ inputs.bun-version }}
       run: |
+        . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
+        github_require_single_line working-directory "$WORKING_DIRECTORY"
         if [ -z "$BUN_VERSION" ] && [ -f "$WORKING_DIRECTORY/package.json" ]; then
           echo "path=$WORKING_DIRECTORY/package.json" >> "$GITHUB_OUTPUT"
         else
@@ -169,12 +171,13 @@ runs:
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
         SKIP_INSTALL: ${{ inputs.skip-install }}
       run: |
+        . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
         if [ -f "$WORKING_DIRECTORY/bun.lock" ]; then
           echo "present=true" >> "$GITHUB_OUTPUT"
         else
           echo "present=false" >> "$GITHUB_OUTPUT"
           if [ "$SKIP_INSTALL" != "true" ]; then
-            echo "::error::$WORKING_DIRECTORY/bun.lock not found — refusing to build a cache key from a missing lockfile" >&2
+            echo "::error::$(github_encode "$WORKING_DIRECTORY/bun.lock not found — refusing to build a cache key from a missing lockfile")" >&2
             exit 1
           fi
         fi

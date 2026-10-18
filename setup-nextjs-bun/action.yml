@@ -110,6 +110,8 @@ runs:
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
         BUN_VERSION: ${{ inputs.bun-version }}
       run: |
+        . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
+        github_require_single_line working-directory "$WORKING_DIRECTORY"
         if [ -z "$BUN_VERSION" ] && [ -f "$WORKING_DIRECTORY/package.json" ]; then
           echo "path=$WORKING_DIRECTORY/package.json" >> "$GITHUB_OUTPUT"
         else
@@ -129,8 +131,10 @@ runs:
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
         NEXT_APP_DIRECTORY_INPUT: ${{ inputs.next-app-directory }}
       run: |
+        . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
+        github_require_single_line working-directory "$WORKING_DIRECTORY"
         if [ ! -f "$WORKING_DIRECTORY/bun.lock" ]; then
-          echo "::error::$WORKING_DIRECTORY/bun.lock not found — refusing to build a cache key from a missing lockfile" >&2
+          echo "::error::$(github_encode "$WORKING_DIRECTORY/bun.lock not found — refusing to build a cache key from a missing lockfile")" >&2
           exit 1
         fi
         # Resolved here (not inlined as inputs.*/env.* expressions in the cache steps below)
@@ -139,6 +143,7 @@ runs:
         # (actions/runner#2009, #2030) — see AGENTS.md. Falls back to working-directory
         # when next-app-directory is unset (the single-app case, e.g. no Bun workspace).
         NEXT_APP_DIR="${NEXT_APP_DIRECTORY_INPUT:-$WORKING_DIRECTORY}"
+        github_require_single_line next-app-directory "$NEXT_APP_DIR"
         echo "NEXT_APP_DIR=${NEXT_APP_DIR}" >> "$GITHUB_ENV"
         echo "NEXT_CACHE_DIR=${NEXT_APP_DIR}/.next/cache" >> "$GITHUB_ENV"
 

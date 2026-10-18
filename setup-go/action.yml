@@ -150,6 +150,7 @@ runs:
         HASH_FILES_SINGLE: ${{ hashFiles(inputs.cache-dependency-path) }}
         NEEDS_DIR: ${{ inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' }}
       run: |
+        . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
         hash_listed() {
           local files=() p
           while IFS= read -r p || [ -n "$p" ]; do
@@ -188,11 +189,12 @@ runs:
         case "$path" in
           *$'\n'*|*'*'*)
             if [ "$NEEDS_DIR" = "true" ]; then
-              echo "::error::run-test/run-test-race/run-lint/run-fmt/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave the gate inputs off for this caller." >&2
+              echo "::error::$(github_encode "run-test/run-test-race/run-lint/run-fmt/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave the gate inputs off for this caller.")" >&2
               exit 1
             fi
             ;;
           *)
+            github_require_single_line go-version-file "$path"
             echo "dir=$(dirname "$path")" >> "$GITHUB_OUTPUT"
             ;;
         esac
@@ -288,20 +290,21 @@ runs:
         ARCH_NAME: ${{ runner.arch }}
       run: |
         set -u
+        . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
         case "$OS_NAME" in
           Linux) os=linux ;;
           macOS) os=darwin ;;
-          *) echo "::error::run-lint/run-fmt supports Linux and macOS runners, not $OS_NAME" >&2; exit 1 ;;
+          *) echo "::error::$(github_encode "run-lint/run-fmt supports Linux and macOS runners, not $OS_NAME")" >&2; exit 1 ;;
         esac
         case "$ARCH_NAME" in
           X64) arch=amd64 ;;
           ARM64) arch=arm64 ;;
-          *) echo "::error::run-lint/run-fmt has no golangci-lint release for runner arch $ARCH_NAME" >&2; exit 1 ;;
+          *) echo "::error::$(github_encode "run-lint/run-fmt has no golangci-lint release for runner arch $ARCH_NAME")" >&2; exit 1 ;;
         esac
         version="${LINT_VERSION#v}"
         case "$version" in
           *[/[:space:]]*|*\'*|*\"*)
-            echo "::error::lint-version must be a single release tag without slashes or whitespace (got '$LINT_VERSION')" >&2
+            echo "::error::$(github_encode "lint-version must be a single release tag without slashes or whitespace (got '$LINT_VERSION')")" >&2
             exit 1
             ;;
         esac
@@ -313,7 +316,7 @@ runs:
         curl -fsSL --max-time 60 --retry 5 --retry-all-errors --retry-max-time 120 -o "$base.tar.gz" "$url/$base.tar.gz"
         curl -fsSL --max-time 60 --retry 5 --retry-all-errors --retry-max-time 120 -o checksums.txt "$url/golangci-lint-$version-checksums.txt"
         grep " $base.tar.gz\$" checksums.txt > expected.txt || {
-          echo "::error::$base.tar.gz is not listed in the v$version checksums file" >&2
+          echo "::error::$(github_encode "$base.tar.gz is not listed in the v$version checksums file")" >&2
           exit 1
         }
         shasum -a 256 -c expected.txt
@@ -397,9 +400,10 @@ runs:
         GOVULNCHECK_VERSION: ${{ inputs.govulncheck-version }}
         GOVULNCHECK_ARGS: ${{ inputs.govulncheck-args }}
       run: |
+        . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
         case "$GOVULNCHECK_VERSION" in
           *[/@[:space:]]*)
-            echo "::error::govulncheck-version must be a single module version without slashes, extra @, or whitespace (got '$GOVULNCHECK_VERSION')" >&2
+            echo "::error::$(github_encode "govulncheck-version must be a single module version without slashes, extra @, or whitespace (got '$GOVULNCHECK_VERSION')")" >&2
             exit 1
             ;;
         esac

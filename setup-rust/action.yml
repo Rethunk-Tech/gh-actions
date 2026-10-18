@@ -71,8 +71,10 @@ runs:
       env:
         WORKING_DIRECTORY: ${{ inputs.working-directory }}
       run: |
+        . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
+        github_require_single_line working-directory "$WORKING_DIRECTORY"
         if [ ! -f "$WORKING_DIRECTORY/Cargo.lock" ]; then
-          echo "::error::$WORKING_DIRECTORY/Cargo.lock not found — refusing to build a cache key from a missing lockfile" >&2
+          echo "::error::$(github_encode "$WORKING_DIRECTORY/Cargo.lock not found — refusing to build a cache key from a missing lockfile")" >&2
           exit 1
         fi
 
