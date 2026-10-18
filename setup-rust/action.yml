@@ -66,6 +66,16 @@ outputs:
 runs:
   using: composite
   steps:
+    - name: Verify lockfile exists
+      shell: bash
+      env:
+        WORKING_DIRECTORY: ${{ inputs.working-directory }}
+      run: |
+        if [ ! -f "$WORKING_DIRECTORY/Cargo.lock" ]; then
+          echo "::error::$WORKING_DIRECTORY/Cargo.lock not found — refusing to build a cache key from a missing lockfile" >&2
+          exit 1
+        fi
+
     # The fingerprint is `rustc -vV` plus the target list: target/ is useless to any other
     # compiler build, and matrix legs that differ only by target share one github.job.
     - name: Install Rust toolchain
