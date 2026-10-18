@@ -1032,6 +1032,34 @@ jobs:
           run-fmt: "true"
           run-govulncheck: "true"
 
+  # Proves the govulncheck gate fires: jwt v4.5.0 has shipped fixes, so a call to jwt.Parse
+  # fails govulncheck. Other gates stay off so only this one can produce the failure.
+  test-setup-go-govulncheck-fail:
+    name: setup-go self-test (govulncheck gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-app-vulnerable/go.mod
+          run-govulncheck: "true"
+      - name: assert the govulncheck gate failed and the other gates stayed off
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          VULN: ${{ steps.setup.outputs.govulncheck-outcome }}
+          LINT: ${{ steps.setup.outputs.lint-outcome }}
+          FMT: ${{ steps.setup.outputs.fmt-outcome }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$VULN" != "failure" ] || [ "$LINT" != "skipped" ] || [ "$FMT" != "skipped" ] || [ "$TEST" != "skipped" ]; then
+            echo "::error::expected govulncheck to fail on a fixable advisory with other gates skipped, got composite '$OUTCOME', govulncheck '$VULN', lint '$LINT', fmt '$FMT', test '$TEST'" >&2
+            exit 1
+          fi
+
   # Proves two things: the lint gate actually fires rather than silently no-op'ing — a fixture
   # with a real errcheck violation (os.Open's error return discarded), confirmed locally to
   # compile clean but fail `golangci-lint run` before this job existed — and that govulncheck

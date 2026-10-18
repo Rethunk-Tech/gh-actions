@@ -174,53 +174,6 @@ Rejected: turning it on by default. Every other security gate here is opt-in.
 - `HUMANS.md` documents the input next to clippy/fmt/test. `gate` stays
   clean.
 
-## govulncheck has no fixture that fails the gate
-
-`test-setup-go-lint-vuln-pass` (`ci.yml:993`) runs govulncheck on the clean
-`go-app` fixture. `test-setup-go-lint-catches-real-issue` (`ci.yml:1014`)
-only asserts govulncheck's outcome is `success` or `failure` after lint
-fails — that the step ran, not that it finds a vuln. `run-lint`, `run-fmt`,
-`run-test`, `run-test-race`, `run-ruff`, `run-audit` (Python, as of the
-`python-app-vulnerable` fixture), `run-clippy`, and `run-audit` (Bun) each
-have a fixture that fails that gate specifically.
-
-Decided shape: a `go-app-vulnerable` module that compiles, is
-golangci-lint clean, and fails `govulncheck` because of a dependency whose
-advisory has a shipped fix. A CI job with `run-govulncheck: "true"` only,
-`continue-on-error` on the composite, asserting `govulncheck-outcome=failure`
-and the other gate outcomes `skipped`. Exclude the fixture from
-`.gate.toml` `[detect] exclude` (govulncheck is in the go-app chain).
-
-Rejected: pinning a stdlib vuln. Those move with the runner's Go version.
-Rejected: asserting only that the step's outcome is non-empty.
-
-### Read
-
-1. `.github/workflows/ci.yml:1014` — the current "govulncheck still runs"
-   job, which this does not replace.
-2. `.github/test-fixtures/python-app-vulnerable/pyproject.toml` — the
-   sibling shape: one known-bad pin, no other gates on that job.
-3. `setup-go/action.yml:343` — the govulncheck step, so the job can leave
-   lint/fmt/test off.
-4. `AGENTS.md` fixture list — add `go-app-vulnerable` in the same commit.
-
-### Traps
-
-- **The module must keep failing as Go and the vuln DB move.** Prefer a
-  third-party module with a GHSA and a patched release, not a stdlib ID
-  that `govulncheck` may stop reporting.
-- **`go-app-broken` is an errcheck violation, not a vuln.** Do not overload
-  it.
-- **govulncheck needs network in CI.** The job already has that; a local
-  `gate` run of this fixture is why it belongs in `[detect] exclude`.
-
-### Acceptance
-
-- The new job fails the composite and reports `govulncheck-outcome=failure`
-  with lint/fmt/test skipped.
-- `go-app` with `run-govulncheck: true` still passes.
-- `AGENTS.md` names the fixture. `gate` stays clean.
-
 ## cache-build has no self-test
 
 `setup-go`'s `cache-build` input (`setup-go/action.yml:31`, default `"true"`)

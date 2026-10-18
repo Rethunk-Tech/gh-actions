@@ -52,6 +52,7 @@ exit "$bad"
 [detect]
 exclude = [
   "go-app-failing",
+  "go-app-vulnerable",
   "python-app-broken",
   "python-app-failing",
   "python-app-unformatted",
