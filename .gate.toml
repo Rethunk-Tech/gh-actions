@@ -4,7 +4,7 @@ run = "bun test audit-bun"
 
 # CI's lint job runs this. It is not a language tool, so detection never sees it.
 [gates.setup-bun-drift]
-run = "python3 scripts/check-setup-bun-drift.py"
+run = "python3 -m unittest discover -s scripts -p 'test_*.py' -v && python3 scripts/check-setup-bun-drift.py"
 
 # Same three lint-job checks as .github/workflows/ci.yml. Detection never sees them.
 [gates.action-yml-schema]

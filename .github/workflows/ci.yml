@@ -59,7 +59,7 @@ jobs:
       # setup-nextjs-bun duplicates setup-bun's shared steps instead of composing them
       # (actions/runner#2009). Fail when those steps diverge without an exception in the script.
       - name: Check setup-bun and setup-nextjs-bun shared steps
-        run: python3 scripts/check-setup-bun-drift.py
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v && python3 scripts/check-setup-bun-drift.py
 
       # A fixture directory silently excluded by .gitignore never reaches CI's checkout, so the
       # self-test that uses it fails at "action can't find its fixture" while its outcome

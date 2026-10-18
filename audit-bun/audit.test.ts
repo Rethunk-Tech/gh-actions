@@ -35,8 +35,15 @@ test("an unknown latest version fails closed", () => {
 	expect(fixable).toHaveLength(1);
 });
 
-test("annotations encode newlines", () => {
-	expect(annotation("warning", "a\nb%")).toBe("::warning::a%0Ab%25");
+test("annotations encode workflow-command metacharacters", () => {
+	const cases: { level: "error" | "warning"; message: string; want: string }[] =
+		[
+			{ level: "warning", message: "a\nb%", want: "::warning::a%0Ab%25" },
+			{ level: "error", message: "a\rb", want: "::error::a%0Db" },
+		];
+	for (const c of cases) {
+		expect(annotation(c.level, c.message)).toBe(c.want);
+	}
 });
 
 test("a non-array advisories value is rejected", () => {
@@ -46,9 +53,12 @@ test("a non-array advisories value is rejected", () => {
 });
 
 test("a malformed advisory is rejected", () => {
-	expect(() =>
-		classify({ p: [null] } as unknown as Report, { p: "1.0.0" }),
-	).toThrow(/malformed advisory/);
+	const cases: unknown[] = [null, {}, { vulnerable_versions: 1 }];
+	for (const advisory of cases) {
+		expect(() =>
+			classify({ p: [advisory] } as unknown as Report, { p: "1.0.0" }),
+		).toThrow(/malformed advisory/);
+	}
 });
 
 test("registry URLs encode every slash so a name cannot walk the path", async () => {
@@ -92,6 +102,23 @@ test("a thrown registry fetch counts as unknown latest", async () => {
 	}) as typeof fetch;
 	try {
 		expect(await latestVersion("lodash")).toBeUndefined();
+	} finally {
+		globalThis.fetch = orig;
+	}
+});
+
+test("a failed or versionless registry response counts as unknown latest", async () => {
+	const orig = globalThis.fetch;
+	const cases: { body: string; status: number }[] = [
+		{ body: "{}", status: 404 },
+		{ body: "{}", status: 200 },
+	];
+	try {
+		for (const c of cases) {
+			globalThis.fetch = (async () =>
+				new Response(c.body, { status: c.status })) as typeof fetch;
+			expect(await latestVersion("lodash")).toBeUndefined();
+		}
 	} finally {
 		globalThis.fetch = orig;
 	}
