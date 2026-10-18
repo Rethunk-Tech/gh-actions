@@ -256,13 +256,19 @@ runs:
           *) echo "::error::run-lint/run-fmt has no golangci-lint release for runner arch $ARCH_NAME" >&2; exit 1 ;;
         esac
         version="${LINT_VERSION#v}"
+        case "$version" in
+          *[/'\"[:space:]]*)
+            echo "::error::lint-version must be a single release tag without slashes or whitespace (got '$LINT_VERSION')" >&2
+            exit 1
+            ;;
+        esac
         base="golangci-lint-$version-$os-$arch"
         url="https://github.com/golangci/golangci-lint/releases/download/v$version"
         dir="$RUNNER_TEMP/setup-go-golangci-lint"
         mkdir -p "$dir"
         cd "$dir" || exit 1
-        curl -fsSL --retry 5 --retry-all-errors --retry-max-time 120 -o "$base.tar.gz" "$url/$base.tar.gz"
-        curl -fsSL --retry 5 --retry-all-errors --retry-max-time 120 -o checksums.txt "$url/golangci-lint-$version-checksums.txt"
+        curl -fsSL --max-time 60 --retry 5 --retry-all-errors --retry-max-time 120 -o "$base.tar.gz" "$url/$base.tar.gz"
+        curl -fsSL --max-time 60 --retry 5 --retry-all-errors --retry-max-time 120 -o checksums.txt "$url/golangci-lint-$version-checksums.txt"
         grep " $base.tar.gz\$" checksums.txt > expected.txt || {
           echo "::error::$base.tar.gz is not listed in the v$version checksums file" >&2
           exit 1
@@ -348,6 +354,12 @@ runs:
         GOVULNCHECK_VERSION: ${{ inputs.govulncheck-version }}
         GOVULNCHECK_ARGS: ${{ inputs.govulncheck-args }}
       run: |
+        case "$GOVULNCHECK_VERSION" in
+          *[/@[:space:]]*)
+            echo "::error::govulncheck-version must be a single module version without slashes, extra @, or whitespace (got '$GOVULNCHECK_VERSION')" >&2
+            exit 1
+            ;;
+        esac
         if [ -n "$GOVULNCHECK_ARGS" ]; then
           # GOVULNCHECK_ARGS may hold multiple space-separated flags; word-splitting is intentional.
           # shellcheck disable=SC2086
