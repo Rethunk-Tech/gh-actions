@@ -141,20 +141,43 @@ runs:
       env:
         GO_VERSION_FILE: ${{ inputs.go-version-file }}
         CACHE_DEPENDENCY_PATH: ${{ inputs.cache-dependency-path }}
+        # hashFiles takes one glob per argument; a newline-joined list is one unmatched pattern.
+        HASH_FILES_SINGLE: ${{ hashFiles(inputs.cache-dependency-path) }}
         NEEDS_DIR: ${{ inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' }}
       run: |
+        hash_listed() {
+          local files=() p
+          while IFS= read -r p || [ -n "$p" ]; do
+            [ -z "$p" ] && continue
+            [ -f "$p" ] || continue
+            files+=("$p")
+          done
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::no module files to hash into the cache key" >&2
+            exit 1
+          fi
+          {
+            printf '%s\n' "${files[@]}" | LC_ALL=C sort | while IFS= read -r f; do
+              sha256sum "$f"
+            done
+          } | sha256sum | awk '{print $1}'
+        }
+
         if [ -n "$CACHE_DEPENDENCY_PATH" ]; then
           path="$CACHE_DEPENDENCY_PATH"
-          deps="$CACHE_DEPENDENCY_PATH"
+          case "$CACHE_DEPENDENCY_PATH" in
+            *$'\n'*)
+              SETUP_GO_DEPS_HASH=$(printf '%s\n' "$CACHE_DEPENDENCY_PATH" | hash_listed)
+              ;;
+            *)
+              SETUP_GO_DEPS_HASH="$HASH_FILES_SINGLE"
+              ;;
+          esac
         else
           path="$GO_VERSION_FILE"
-          deps="$(dirname "$GO_VERSION_FILE")/go.sum"$'\n'"$GO_VERSION_FILE"
+          SETUP_GO_DEPS_HASH=$(printf '%s\n' "$(dirname "$GO_VERSION_FILE")/go.sum" "$GO_VERSION_FILE" | hash_listed)
         fi
-        {
-          echo "deps<<SETUP_GO_EOF"
-          echo "$deps"
-          echo "SETUP_GO_EOF"
-        } >> "$GITHUB_OUTPUT"
+        echo "SETUP_GO_DEPS_HASH=$SETUP_GO_DEPS_HASH" >> "$GITHUB_ENV"
         # A multi-line (multi-module) or glob value has no single dirname. Only the gates need
         # one; fail loudly for them rather than derive a wrong directory.
         case "$path" in
@@ -187,9 +210,9 @@ runs:
         path: |
           ${{ env.SETUP_GO_MOD_CACHE }}
           ${{ env.SETUP_GO_BUILD_CACHE }}
-        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-${{ github.job }}
+        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-${{ github.job }}
         restore-keys: |
-          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-
+          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-
           setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
 
     - name: Cache Go modules
@@ -198,26 +221,41 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.SETUP_GO_MOD_CACHE }}
-        key: setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-${{ github.job }}
+        key: setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-${{ github.job }}
         restore-keys: |
-          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}-
+          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-
           setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
 
     # Go's own trim only drops entries unused for five days, so each dependency change stacks
     # a new build generation on the restored one until the runner's disk fills. Go bumps an
     # entry's mtime when a build uses it and the mtime is over an hour old, so the entries the
-    # saving job used all sit within its duration plus an hour of the newest one; keep those and
-    # drop the rest. A job over an hour long can lose some of its own entries, which costs a
-    # rebuild of them, not correctness.
+    # saving job used all sit within two hours of the newest one (an hour of job time plus that
+    # bump); keep those and drop the rest. A job over two hours long can lose some of its own
+    # entries, which costs a rebuild of them, not correctness.
     - name: Prune build cache to the saving job's working set
-      if: inputs.cache-build != 'false' && runner.os == 'Linux'
+      if: inputs.cache-build != 'false'
       shell: bash
       run: |
         [ -d "$SETUP_GO_BUILD_CACHE" ] || exit 0
-        newest=$(find "$SETUP_GO_BUILD_CACHE" -type f -printf '%T@\n' | sort -n | tail -1)
-        [ -n "$newest" ] || exit 0
+        mtime() {
+          stat -c '%Y' "$1" 2>/dev/null || stat -f '%m' "$1"
+        }
+        newest=0
+        while IFS= read -r -d '' f; do
+          t=$(mtime "$f") || continue
+          if [ "$t" -gt "$newest" ]; then
+            newest=$t
+          fi
+        done < <(find "$SETUP_GO_BUILD_CACHE" -type f -print0)
+        [ "$newest" -gt 0 ] || exit 0
         before=$(du -sm "$SETUP_GO_BUILD_CACHE" | cut -f1)
-        find "$SETUP_GO_BUILD_CACHE" -type f ! -newermt "@$(( ${newest%.*} - 7200 ))" -delete
+        cutoff=$((newest - 7200))
+        while IFS= read -r -d '' f; do
+          t=$(mtime "$f") || continue
+          if [ "$t" -lt "$cutoff" ]; then
+            rm -f "$f"
+          fi
+        done < <(find "$SETUP_GO_BUILD_CACHE" -type f -print0)
         echo "Go build cache pruned from ${before} MB to $(du -sm "$SETUP_GO_BUILD_CACHE" | cut -f1) MB"
 
     # The golangci-lint binary is downloaded rather than cached: the release fetch measured
@@ -229,7 +267,7 @@ runs:
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/setup-go-golangci-lint
-        key: setup-go-lint-${{ runner.os }}-${{ runner.arch }}-${{ inputs.lint-version }}-${{ hashFiles(steps.moddir.outputs.deps) }}
+        key: setup-go-lint-${{ runner.os }}-${{ runner.arch }}-${{ inputs.lint-version }}-${{ env.SETUP_GO_DEPS_HASH }}
         restore-keys: |
           setup-go-lint-${{ runner.os }}-${{ runner.arch }}-${{ inputs.lint-version }}-
 
