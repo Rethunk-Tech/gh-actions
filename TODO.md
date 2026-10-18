@@ -7,7 +7,7 @@ Sections are unordered.
 
 ## upload-pages is designed and still has one caller
 
-`HUMANS.md:340` (`Coming later`) and `AGENTS.md:48` already name this. The
+`AGENTS.md` Status (`Designed, not yet built`) already names this. The
 action would be a near-pure passthrough around `actions/upload-pages-artifact`,
 saving a couple of lines at each call site. It currently has exactly one
 caller (`Rethunk-AI/bakeoff-results`), which otherwise depends on nothing in
@@ -29,7 +29,7 @@ Rejected: wrapping it because a second caller "might" appear.
 
 1. `AGENTS.md:48` — status, the one-caller count, and the instruction to
    re-verify against the fleet before building.
-2. `HUMANS.md:340` — consumer-facing "Coming later" pointer.
+2. `HUMANS.md` — consumers see shipped actions only; do not re-add a "coming later" section.
 3. `AGENTS.md:82` — conventions every action here follows. A new directory
    copies those, it does not invent a Pages-specific exception.
 4. The caller's workflow in `Rethunk-AI/bakeoff-results` — confirm it still
@@ -55,8 +55,8 @@ Rejected: wrapping it because a second caller "might" appear.
   that a composite would collapse.
 - `upload-pages/action.yml` is schema-valid, SHA-pins its wrapped action, and
   has a self-test job in `.github/workflows/ci.yml`.
-- `HUMANS.md`'s "Coming later" section is removed in the same commit the
-  action ships. `gate` stays clean.
+- `HUMANS.md` gains a usage section for the new action in the same commit it
+  ships. `gate` stays clean.
 
 ## setup-nextjs-bun has no audit or test gate
 

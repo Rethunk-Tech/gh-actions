@@ -17,6 +17,7 @@ WATCHED = (
     "Resolve Bun version file",
     "Setup Bun",
     "Cache Bun install store",
+    "Cache extra paths",
     "Resolve Playwright version",
     "Cache Playwright browsers",
     "Install Playwright",

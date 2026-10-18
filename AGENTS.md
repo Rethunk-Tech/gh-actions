@@ -21,7 +21,7 @@ without a Release silently makes that instruction wrong.
 
 Composite GitHub Actions shared across the fleet (multiple orgs: Rethunk-Tech, Rethunk-AI,
 Albino-Geek-Services, Citadel-Inc, and others), built to remove copy-pasted CI boilerplate —
-Bun/Go/Python toolchain setup, dependency caching — that was drifting independently per repo.
+Bun/Next.js/Go/Python/Rust toolchain setup, dependency caching — that was drifting independently per repo.
 Public, not Marketplace-listed: Marketplace adds a global-uniqueness naming requirement, a
 root-only/no-workflows repo constraint, and public-discoverability overhead for zero
 functional gain over a plain public repo, which is all `uses: owner/repo/path@ref`
@@ -216,9 +216,9 @@ local has no public answer yet. Given that ambiguity, `setup-nextjs-bun` duplica
 Two consequences that matter if you touch either action:
 
 1. **Shared steps are checked.** `scripts/check-setup-bun-drift.py` fails the lint job and
-   the `setup-bun-drift` gate when Bun version resolution, the install-store cache, or the
-   Playwright branch diverges. A difference that stays is an exception in that script, reviewed
-   with the change. The steps stay duplicated; the actions are not composed.
+   the `setup-bun-drift` gate when Bun version resolution, the install-store cache, extra-path
+   cache, or the Playwright branch diverges. A difference that stays is an exception in that
+   script, reviewed with the change. The steps stay duplicated; the actions are not composed.
 2. `setup-nextjs-bun`'s own `.next/cache` step resolves its path via `$GITHUB_ENV` in the
    guard step rather than an inline `inputs.working-directory` expression — this keeps it safe
    at nesting depth 1, but **a consumer that wraps this action inside their own local
@@ -250,4 +250,4 @@ actions themselves need a GitHub runner and are not reproducible locally. Warm: 
 5 CPU-s. Cold (fresh `GOCACHE`, `XDG_CACHE_HOME` and golangci-lint cache): 4.8 s wall, 28 CPU-s, the
 `go-app` chain being the slowest step. No oversubscription and no duplicated steps.
 
-`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing), `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`), and the lint job's action.yml schema, undeclared-input, and tracked-fixture checks. It also lists the fixtures that are broken on purpose (`python-app-broken`, `python-app-failing`, `python-app-unformatted`, `python-app-vulnerable`, `rust-app-failing`, `bun-app-failing`) under `[detect] exclude`, because gate gates every directory CI names via `working-directory` and those fail by design. `go-app-failing` is also excluded: CI only passes it as `go-version-file`, so detection does not pick it up as a working-directory the way it does those others. Warm with v0.6.5: 1.1 s wall, 4.7 CPU-s.
+`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing), `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`), and the lint job's action.yml schema, undeclared-input, and tracked-fixture checks. It also lists the fixtures that are broken on purpose (`python-app-broken`, `python-app-failing`, `python-app-unformatted`, `python-app-vulnerable`, `rust-app-failing`, `bun-app-failing`, `go-app-failing`) under `[detect] exclude`, because gate gates every directory CI names via `working-directory` and those fail by design. `go-app-failing` is listed even though CI only passes it as `go-version-file` (detection would not pick it up as a working-directory the way it does the others). `bun-app-vulnerable` is not excluded: biome and `bun test` still pass; only the audit gate fails. Warm with v0.6.5: 1.1 s wall, 4.7 CPU-s.

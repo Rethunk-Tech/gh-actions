@@ -19,7 +19,7 @@ drifting independently per repo across the fleet.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.16
   with:
     working-directory: frontend
 ```
@@ -36,7 +36,7 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   documented CI caching guide (lockfile hash + source-file hash, independently invalidated).
 - `setup-go` caches modules and the build cache per job, so a lint job never overwrites the
   `-race` build a test job needs, with a same-Go-version fallback across jobs.
-- `setup-go` also bundles opt-in `go test ./...` (no `-race`), `go test -race ./...`, golangci-lint, `golangci-lint fmt`, and govulncheck gates,
+- `setup-go` also bundles opt-in `go test ./...` (no `-race`), `go test -race ./...`, golangci-lint, `golangci-lint fmt --diff`, and govulncheck gates,
   each `continue-on-error` behind a final gate step — enabling more than one still surfaces
   every finding even if one fails.
 - `setup-python` wraps `astral-sh/setup-uv` with the cache forced on (upstream's `auto` default
@@ -47,8 +47,9 @@ Full inputs/outputs, pinning practice, and the `setup-nextjs-bun` variant: [HUMA
   opt-in `run-test` runs `bun test`.
 - `install-playwright` (`setup-bun`/`setup-nextjs-bun`) caches browsers by the resolved
   `@playwright/test` version, matching Playwright's own documented CI caching guide.
-- `extra-cache-paths` (`setup-bun`) caches a build directory the repo owns alongside the
-  install store, on a caller-supplied key — for a Turborepo `.turbo` or similar.
+- `extra-cache-paths` (`setup-bun` and `setup-nextjs-bun`) caches a build directory the repo
+  owns alongside the install store, on a caller-supplied key — for a Turborepo `.turbo` or
+  similar.
 - Every wrapped dependency is SHA-pinned with a version comment; the repo-ops
   actions-refresh-sha sweep keeps pins current fleet-wide.
 - Actually tested, not just schema-checked: each action runs end-to-end via `act` before a

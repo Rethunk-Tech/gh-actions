@@ -25,14 +25,12 @@ inputs:
   install-playwright:
     description: >
       When true, installs Playwright browsers, caching them by the resolved @playwright/test
-      (or playwright) version in working-directory/package.json — a version bump invalidates
-      the cache outright rather than partially restoring a stale browser build, matching
-      Playwright's own documented CI caching guide. Runs regardless of skip-install — bunx
-      fetches Playwright standalone, no node_modules required — but when combined with
-      skip-install, the fetched version isn't pinned to the project's own devDependency (no
-      bun install has run yet to pin it), and no package.json may exist to resolve a version
-      from at all — in that case the cache key falls back to "unpinned" (still caches, just
-      not invalidated by a version bump you'd have no devDependency to see anyway).
+      (or playwright) version in playwright-directory (or working-directory) package.json — a
+      version bump invalidates the cache outright rather than partially restoring a stale
+      browser build, matching Playwright's own documented CI caching guide. Runs regardless of
+      skip-install: bunx fetches Playwright standalone, no node_modules required. The CLI is
+      pinned with bunx playwright@<version> when that package.json names a pin; otherwise the
+      cache key is "unpinned" (still caches, not invalidated by a version bump).
     required: false
     default: "false"
   playwright-browsers:

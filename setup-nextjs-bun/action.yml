@@ -30,9 +30,10 @@ inputs:
   install-playwright:
     description: >
       When true, installs Playwright browsers, caching them by the resolved @playwright/test
-      (or playwright) version in working-directory/package.json — a version bump invalidates
-      the cache outright rather than partially restoring a stale browser build, matching
-      Playwright's own documented CI caching guide.
+      (or playwright) version in playwright-directory (or working-directory) package.json — a
+      version bump invalidates the cache outright rather than partially restoring a stale
+      browser build, matching Playwright's own documented CI caching guide. The CLI is pinned
+      with bunx playwright@<version> when that package.json names a pin.
     required: false
     default: "false"
   playwright-browsers:

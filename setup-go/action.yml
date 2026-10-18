@@ -83,7 +83,7 @@ inputs:
     required: false
     default: "false"
   govulncheck-version:
-    description: govulncheck version to run. Fleet-latest as of this writing.
+    description: govulncheck version to run.
     required: false
     default: v1.9.0
   govulncheck-args:

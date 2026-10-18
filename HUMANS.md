@@ -18,7 +18,7 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.16
   with:
     working-directory: frontend        # default: .
     # bun-version: "1.4.3"            # default: resolved from package.json's packageManager
@@ -43,12 +43,14 @@ snapshots of CJK or Thai text in CI should install those fonts itself. Combined 
 `playwright-directory`'s package.json, not an unpinned `bunx playwright`.
 
 **Caching a build directory too** — a path the repo owns that should not be keyed on the
-lockfile, such as a Turborepo `.turbo`. Both inputs are required for the cache to run at all;
-leaving the restore fragment empty restores from any previous extra cache for this OS, which
-is what a SHA-keyed cache wants because its key never repeats:
+lockfile, such as a Turborepo `.turbo`. `extra-cache-paths` and `extra-cache-key` are both
+required for the cache to run at all (`extra-cache-restore-key-fragment` is optional). Paths
+use `actions/cache` `path` form (newline-separated for more than one). Leaving the restore
+fragment empty restores from any previous extra cache for this OS, which is what a SHA-keyed
+cache wants because its key never repeats:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.16
   with:
     extra-cache-paths: .turbo
     extra-cache-key: ${{ github.sha }}
@@ -60,7 +62,7 @@ to put a `bun` binary on PATH), or one that must run `bun install` itself later 
 setup steps that have to happen first (e.g. cloning sibling repos for Bun `link:` resolution):
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.16
   with:
     skip-install: "true"     # only installs the bun binary; no lockfile check, no bun install.
                              # The install-store cache still runs whenever a bun.lock is
@@ -73,7 +75,7 @@ advisories whose fix has shipped. An advisory with no patched release warns and 
 fail the job. A caller that already has an `audit-bun` step leaves `run-audit` unset.
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.16
   with:
     run-audit: "true"
     # working-directory: frontend
@@ -85,7 +87,7 @@ summary table as the audit gate. A caller that already runs its own test step le
 unset.
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.16
   with:
     run-test: "true"
     # working-directory: frontend
@@ -100,7 +102,7 @@ One Next.js app per call — for a repo with multiple Next apps, call this once 
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.16
   with:
     working-directory: frontend
     # bun-version, node-version, next-app-directory, install-playwright,
@@ -113,13 +115,16 @@ Next app itself lives in a subdirectory (`.next/`, source files to hash for the 
 key) — set `next-app-directory` separately from `working-directory`:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.16
   with:
     working-directory: .                     # workspace root — bun install runs here
     next-app-directory: apps/dashboard        # the actual Next app — .next/cache lives here
 ```
 
 Leave `next-app-directory` unset for a single-app repo — it defaults to `working-directory`.
+
+`extra-cache-paths`, `extra-cache-key`, and `extra-cache-restore-key-fragment` work the same
+as on `setup-bun` (both paths and key required, restore fragment optional).
 
 Outputs: `cache-hit` — whether the Bun install-store cache was hit. Same Playwright
 outputs as `setup-bun` when `install-playwright` is on.
@@ -134,7 +139,7 @@ plain suite.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.16
   with:
     go-version-file: go.mod          # default; may point into a subdir, e.g. backend/go.mod
     # go-version: "1.26.5"           # exact version instead — overrides go-version-file
@@ -152,13 +157,14 @@ job saved for the same Go version. Matrix legs share one job id and therefore on
 `cache-build` defaults to true. Set it to `"false"` to store the module cache only (no build cache, no prune).
 
 **Test gate** — set `run-test` to `"true"` in the job that owns the module's plain test gate.
-It runs `go test ./...` from the directory named by `go-version-file` (or the matching
-`cache-dependency-path` when that is the path used to locate the module). The command does not
+It runs `go test ./...` from the module directory: `cache-dependency-path` wins when it is
+set, otherwise the directory of `go-version-file`. A multi-line or glob `cache-dependency-path`
+has no single directory, so any enabled gate fails rather than guessing. The command does not
 pass `-race`. The input defaults to `"false"` so existing setup-only and lint/vuln-only callers
 do not start running tests.
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.16
   with:
     run-test: "true"
     go-version-file: backend/go.mod
@@ -170,7 +176,7 @@ does not enable the other. The input defaults to `"false"` so existing setup-onl
 lint/vuln-only callers do not start running tests.
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.16
   with:
     run-test-race: "true"
     go-version-file: backend/go.mod
@@ -181,7 +187,7 @@ already names (no separate `working-directory` input needed), each `continue-on-
 a final gate step, so enabling more than one still surfaces every finding even if one fails:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-go@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.16
   with:
     run-lint: "true"                 # Linux and macOS runners; binary checksum-verified per run
     # run-test-race: "false"         # default; keep this a lint/vuln-only job
@@ -191,7 +197,7 @@ a final gate step, so enabling more than one still surfaces every finding even i
                                      # and one input for both would fail every repo that has only
                                      # ever run `golangci-lint run`
     run-govulncheck: "true"
-    # govulncheck-version: v1.9.0    # default: fleet-latest as of this writing
+    # govulncheck-version: v1.9.0    # default
     # govulncheck-args: -tags=foo
 ```
 
@@ -208,7 +214,7 @@ job — opt-in, off by default.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-python@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-python@v1.16
   with:
     # python-version: "3.14"          # default: resolved from .python-version / requires-python
     # uv-version: "0.11.28"           # default: from pyproject.toml/uv.toml, else latest
@@ -231,7 +237,7 @@ needs ruff present in the synced environment, which for most repos means adding 
 than one still surfaces every finding even if an earlier one fails:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-python@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-python@v1.16
   with:
     install-args: --locked --group dev
     run-ruff: "true"
@@ -254,7 +260,7 @@ pytest in the synced environment. A caller that already runs its own test step l
 unset.
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-python@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-python@v1.16
   with:
     install-args: --locked --group dev
     run-test: "true"
@@ -264,7 +270,7 @@ unset.
 and `uvx` on PATH for a standalone tool:
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-python@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-python@v1.16
   with:
     skip-install: "true"     # only installs uv and the interpreter; no uv sync. The cache is
                              # still restored and saved.
@@ -277,7 +283,7 @@ cache keyed per job.
 
 ```yaml
 - uses: actions/checkout@v7
-- uses: Rethunk-Tech/gh-actions/setup-rust@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-rust@v1.16
   with:
     # toolchain: "1.98"                  # default: rust-toolchain.toml, else stable
     # components: rustfmt, clippy        # comma- or space-separated
@@ -308,7 +314,7 @@ separate from `run-clippy` and `run-fmt`, which do not run the test suite. A cal
 invocation differs keeps its own step and leaves `run-test` unset.
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-rust@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-rust@v1.16
   with:
     run-clippy: "true"
     run-fmt: "true"
@@ -331,27 +337,22 @@ range excludes the package's latest published version. One with no patched relea
 `::warning::` carrying its `bun why` chain and does not fail the job. Needs Bun on PATH.
 
 ```yaml
-- uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
-- uses: Rethunk-Tech/gh-actions/audit-bun@v1.14
+- uses: Rethunk-Tech/gh-actions/setup-bun@v1.16
+- uses: Rethunk-Tech/gh-actions/audit-bun@v1.16
   with:
     # working-directory: .              # where package.json and bun.lock live
 ```
-
-### Coming later
-
-`upload-pages` is designed but not yet built — see [AGENTS.md](AGENTS.md)
-for status.
 
 ## Pinning
 
 Point-release tags (`v1.11`, `v1.12`, …) are immutable. The floating major `v1` is moved by
 `.github/workflows/release.yml` to the newest `v1.N` when that tag is the latest in the major.
 
-Convenience examples here use the current point-release (`@v1.14`). Fleet call sites pin by
+Convenience examples here use the current point-release (`@v1.16`). Fleet call sites pin by
 commit SHA with a version comment, matching how these actions pin their own dependencies:
 
 ```yaml
-uses: Rethunk-Tech/gh-actions/setup-bun@<sha> # v1.14
+uses: Rethunk-Tech/gh-actions/setup-bun@<sha> # v1.16
 ```
 
 Check [the releases page](https://github.com/Rethunk-Tech/gh-actions/releases) for the current
@@ -361,7 +362,7 @@ not a stale pin: `setup-rust` is not on `v1.10`, so `setup-rust@v1.10` fails wit
 
 The repo-ops actions-refresh-sha sweep ([Rethunk-Tech/repo-ops](https://github.com/Rethunk-Tech/repo-ops))
 keeps an existing **SHA** pin current within a major automatically; it has nothing to act on for a
-bare version-tag reference like `@v1.14` (there is no stale SHA in that reference for the sweep to
+bare version-tag reference like `@v1.16` (there is no stale SHA in that reference for the sweep to
 find). Crossing a major (`v1` → `v2`) needs actions-refresh-sha with the latest option, and
 only ever applies to SHA pins either way.
 
