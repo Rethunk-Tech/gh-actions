@@ -29,8 +29,11 @@ Conventional commits: `type(scope): subject`, e.g. `feat(setup-go): add Go toolc
    fixture — see [AGENTS.md § Testing an action before committing it](AGENTS.md#testing-an-action-before-committing-it)
    for the cold/warm-cache testing pattern and its gotchas. A schema-valid, shellcheck-clean
    action can still be functionally broken; only actually running it catches that.
-5. `.github/workflows/ci.yml` runs the same checks — a red CI run on a PR means one of the
-   above wasn't done first.
+5. `.github/workflows/ci.yml` schema-validates every `action.yml`, checks undeclared inputs,
+   shared-step drift, tracked fixtures, and actionlint on workflows — the same root checks
+   `.gate.toml` adds on top of detection. Fixture language gates (biome, `go test`, ruff,
+   clippy) run in local `gate` only; the composite self-test jobs exercise the actions, not
+   those fixture checks. A red CI run on a PR still means something above wasn't done first.
 
 ## Adding a new action
 
