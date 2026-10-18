@@ -336,6 +336,33 @@ jobs:
             exit 1
           fi
 
+  # skip-install + run-audit: bun audit reads the lockfile. The vulnerable fixture is the
+  # assertion that the audit step actually ran: a skipped step's outcome is not "failure",
+  # and the gate treats a skipped outcome as pass.
+  test-setup-bun-skip-install-audit:
+    name: setup-bun self-test (skip-install still audits)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-bun
+        with:
+          working-directory: .github/test-fixtures/bun-app-vulnerable
+          skip-install: "true"
+          run-audit: "true"
+      - name: assert skip-install still failed the audit gate
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          AUDIT: ${{ steps.setup.outputs.audit-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$AUDIT" != "failure" ]; then
+            echo "::error::skip-install gated or skipped bun audit; expected composite failure and audit-outcome=failure, got composite '$OUTCOME', audit '$AUDIT'" >&2
+            exit 1
+          fi
+
   test-setup-bun-test-pass:
     name: setup-bun self-test (test gate, clean fixture)
     needs: test-setup-bun-cold
