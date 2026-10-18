@@ -111,8 +111,10 @@ runs:
         # setup-uv's own default is 'auto', which silently DISABLES the cache on release, tag
         # push, pull_request_target and workflow_run events — exactly the events where a
         # release job's cold install costs the most. Every fleet caller already overrode it to
-        # true, including on release workflows, so that intent is the default here.
-        enable-cache: true
+        # true, including on release workflows, so that intent is the default here. The two
+        # events that run with a fork's code and the base repo's cache stay off: a poisoned
+        # cache saved there would be restored by every trusted run.
+        enable-cache: ${{ github.event_name != 'pull_request_target' && github.event_name != 'workflow_run' }}
         # The skip-install/PATH-tool caller has no uv.lock or pyproject to hash. Without this,
         # the post-step save fails the job over a cache that was never going to be useful.
         ignore-nothing-to-cache: true
