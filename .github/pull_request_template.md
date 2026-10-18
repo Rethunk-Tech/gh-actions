@@ -4,14 +4,10 @@
 
 ## Verification
 
-- [ ] `gate` from the repository root
-- [ ] `check-jsonschema --builtin-schema vendor.github-actions <action>/action.yml` for every changed `action.yml`
-- [ ] `shellcheck` on every changed `run:` block
-- [ ] Ran the action end-to-end with [`act`](https://github.com/nektos/act) against a real fixture — not just schema-checked (see [AGENTS.md § Testing an action before committing it](../AGENTS.md#testing-an-action-before-committing-it))
-- [ ] `.github/workflows/ci.yml` passes
+[CONTRIBUTING.md](../CONTRIBUTING.md). Local: `gate` from the root. Action changes also need `act` against a real fixture ([AGENTS.md](../AGENTS.md#testing-an-action-before-committing-it)).
 
 ## Risk
 
-- [ ] Changes a wrapped action's SHA pin (major version bump — reviewed the upstream changelog)
-- [ ] Changes an existing action's default input value (breaking for current consumers)
-- [ ] New action, no existing consumer affected
+- [ ] Wrapped-action SHA pin major bump (reviewed upstream changelog)
+- [ ] Existing action default input change
+- [ ] New action
