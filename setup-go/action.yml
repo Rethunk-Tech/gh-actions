@@ -295,7 +295,7 @@ runs:
         esac
         version="${LINT_VERSION#v}"
         case "$version" in
-          *[/'\"[:space:]]*)
+          *[/[:space:]]*|*\'*|*\"*)
             echo "::error::lint-version must be a single release tag without slashes or whitespace (got '$LINT_VERSION')" >&2
             exit 1
             ;;
