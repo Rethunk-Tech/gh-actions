@@ -29,8 +29,22 @@ export function classify(
 	const fixable: Finding[] = [];
 	const unfixable: Finding[] = [];
 	for (const [pkg, advisories] of Object.entries(report)) {
+		if (!Array.isArray(advisories)) {
+			throw new TypeError(
+				`bun audit JSON for ${JSON.stringify(pkg)} is not an advisory list`,
+			);
+		}
 		const version = latest[pkg];
 		for (const advisory of advisories) {
+			if (
+				advisory === null ||
+				typeof advisory !== "object" ||
+				typeof advisory.vulnerable_versions !== "string"
+			) {
+				throw new TypeError(
+					`bun audit JSON for ${JSON.stringify(pkg)} has a malformed advisory`,
+				);
+			}
 			const finding = { pkg, advisory, latest: version };
 			const stillVulnerable =
 				version !== undefined &&
@@ -48,20 +62,29 @@ export const annotation = (
 ): string =>
 	`::${level}::${message.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A")}`;
 
-async function latestVersion(pkg: string): Promise<string | undefined> {
-	const res = await fetch(
-		`https://registry.npmjs.org/${pkg.replace("/", "%2F")}/latest`,
-	);
-	if (!res.ok) {
+function registryLatestUrl(pkg: string): string {
+	return `https://registry.npmjs.org/${pkg.replaceAll("/", "%2F")}/latest`;
+}
+
+export async function latestVersion(pkg: string): Promise<string | undefined> {
+	try {
+		const res = await fetch(registryLatestUrl(pkg), {
+			signal: AbortSignal.timeout(10_000),
+		});
+		if (!res.ok) {
+			return undefined;
+		}
+		return ((await res.json()) as { version?: string }).version;
+	} catch {
 		return undefined;
 	}
-	return ((await res.json()) as { version?: string }).version;
 }
 
 async function why(pkg: string): Promise<string> {
 	const proc = Bun.spawn(["bun", "why", pkg], {
 		stdout: "pipe",
 		stderr: "pipe",
+		timeout: 30_000,
 	});
 	const out = await new Response(proc.stdout).text();
 	await proc.exited;
@@ -72,6 +95,7 @@ async function main(): Promise<number> {
 	const proc = Bun.spawn(["bun", "audit", "--json"], {
 		stdout: "pipe",
 		stderr: "inherit",
+		timeout: 120_000,
 	});
 	const raw = await new Response(proc.stdout).text();
 	await proc.exited;
@@ -113,5 +137,11 @@ async function main(): Promise<number> {
 }
 
 if (import.meta.main) {
-	process.exit(await main());
+	try {
+		process.exit(await main());
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		console.log(annotation("error", message));
+		process.exit(1);
+	}
 }
