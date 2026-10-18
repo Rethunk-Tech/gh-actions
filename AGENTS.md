@@ -178,7 +178,7 @@ to get wrong when writing that kind of test:
   varies. This file is the only thing that proves any action works; being obvious when it
   fails outranks being short.
 - **Playwright browser-cache keys are the resolved package version, not the job name.** Each
-  Playwright fixture therefore pins a *different* `@playwright/test` (1.63.0 / 1.55.1 / 1.52.0).
+  Playwright fixture therefore pins a *different* `@playwright/test` (1.64.1 / 1.55.1 / 1.52.0).
   Sharing one version lets two cold jobs race `playwright-<os>-<version>` after the reset job
   wipes the prefix. `playwright-directory` is covered by the skip-install workspace fixture:
   the pin lives only under `apps/web`, which is the Bastion/caldera/prepaudit shape.

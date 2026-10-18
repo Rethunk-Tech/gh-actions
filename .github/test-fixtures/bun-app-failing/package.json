@@ -2,8 +2,8 @@
 	"name": "gh-actions-test-fixture-bun-failing",
 	"version": "0.0.0",
 	"private": true,
-	"packageManager": "bun@1.4.0",
+	"packageManager": "bun@1.4.3",
 	"dependencies": {
-		"is-number": "6.0.0"
+		"is-number": "7.0.0"
 	}
 }

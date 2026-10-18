@@ -21,7 +21,7 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 - uses: Rethunk-Tech/gh-actions/setup-bun@v1.14
   with:
     working-directory: frontend        # default: .
-    # bun-version: "1.4.0"            # default: resolved from package.json's packageManager
+    # bun-version: "1.4.3"            # default: resolved from package.json's packageManager
     # install-args: --no-frozen-lockfile
     # node-version: "22"               # opt-in Node runtime alongside Bun
     # install-playwright: "true"
@@ -185,13 +185,13 @@ a final gate step, so enabling more than one still surfaces every finding even i
   with:
     run-lint: "true"                 # Linux and macOS runners; binary checksum-verified per run
     # run-test-race: "false"         # default; keep this a lint/vuln-only job
-    # lint-version: v2.14.0          # default: built with go1.27, matching the fleet's modules
+    # lint-version: v2.15.0          # default: built with go1.27, matching the fleet's modules
     # lint-args: --timeout 5m        # extra flags for `golangci-lint run` only
     run-fmt: "true"                  # separate input: `golangci-lint run` does not run formatters,
                                      # and one input for both would fail every repo that has only
                                      # ever run `golangci-lint run`
     run-govulncheck: "true"
-    # govulncheck-version: v1.8.0    # default: fleet-latest as of this writing
+    # govulncheck-version: v1.9.0    # default: fleet-latest as of this writing
     # govulncheck-args: -tags=foo
 ```
 
