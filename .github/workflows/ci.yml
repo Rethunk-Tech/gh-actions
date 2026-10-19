@@ -697,6 +697,19 @@ jobs:
             exit 1
           fi
 
+  # homebrew-tap / scoop-bucket shape: go-version only, no go.mod anywhere, Go used for go install.
+  test-setup-go-no-module:
+    name: setup-go self-test (no module, tools only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./setup-go
+        with:
+          go-version: "1.27.2"
+          cache-build: "false"
+      - run: go version
+
   # Same one-job, two-leg shape as test-setup-go-cache: setup-rust also keys on github.job.
   # The fixture's rust-toolchain.toml names clippy, so clippy running proves the toolchain-file
   # path installed its components.

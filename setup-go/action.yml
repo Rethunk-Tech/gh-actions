@@ -158,9 +158,11 @@ runs:
             [ -f "$p" ] || continue
             files+=("$p")
           done
+          # A caller that only installs Go tools (go install x@v) has no module; key its cache
+          # on the toolchain alone rather than failing the job.
           if [ "${#files[@]}" -eq 0 ]; then
-            echo "::error::no module files to hash into the cache key" >&2
-            exit 1
+            echo "no-modules"
+            return 0
           fi
           {
             printf '%s\n' "${files[@]}" | LC_ALL=C sort | while IFS= read -r f; do
