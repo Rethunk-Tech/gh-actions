@@ -253,8 +253,8 @@ jobs:
             exit 1
           fi
 
-  # One-sided extra-cache used to skip the cache step with no error. The composite must fail
-  # and name both inputs — a caller that forgets the key is not caching.
+  # A one-sided extra-cache must fail the composite and name both inputs: a caller that
+  # forgets the key is not caching.
   test-setup-bun-extra-cache-paths-only-fail:
     name: setup-bun self-test (extra-cache paths without key fails)
     needs: test-setup-bun-cold
@@ -760,8 +760,8 @@ jobs:
             exit 1
           fi
 
-  # A wrong working-directory used to share one empty hashFiles() cache key with every other
-  # missing-lockfile caller. Fail closed, matching setup-bun's missing bun.lock.
+  # A wrong working-directory would share one empty hashFiles() cache key with every other
+  # missing-lockfile caller, so it fails closed, matching setup-bun's missing bun.lock.
   test-setup-rust-no-lockfile:
     name: setup-rust self-test (missing Cargo.lock fails)
     runs-on: ubuntu-latest
