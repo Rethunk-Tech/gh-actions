@@ -52,22 +52,6 @@ caller. Pick it up by giving it its own directory following the conventions belo
 the design against the fleet's current state before building rather than trusting old design
 notes as binding.
 
-### Re-measured and still not worth building
-
-Each of these was checked against every workflow file in the fleet, not against an older design
-note. Re-measure before proposing any of them again; the counts, not the idea, are what decide.
-
-| Candidate | Bar | Measured | Verdict |
-| --- | --- | --- | --- |
-| `upload-pages` | 2+ caller repos | 1 (`Rethunk-AI/bakeoff-results`) | Unchanged since it was deferred — still wait |
-| `setup-dotnet` | any caller with CI | two CI callers, mortar-bepinex-bridge and mortar-smapi-bridge, each only actions/setup-dotnet with dotnet-version 10.0.x | Still dropped: that is a one-line passthrough, and build/test stays in the caller. |
-| `setup-node` | 2+ caller repos needing more than a passthrough | 5 sites / 4 repos, but 4 are a bare `node-version: "24"` with no install or cache to share — Node as a runtime for `make verify` or syft. `setup-bun`'s own `node-version` input already covers the Bun-adjacent case | Passthrough, dropped |
-
-`setup-python`, by contrast, cleared the bar outright: 15 hand-rolled setup
-hand-rolled sites across 10 workflows in 6 repos, split across four incompatible variants
-(`enable-cache` present vs absent, uv version pinned vs floating, and Python selected three
-different ways — `setup-uv`'s `python-version`, `actions/setup-python`, and `uv python install`).
-
 ### Recount
 
 Next work is a read-only fleet recount of hand-rolled CI steps. A new composite action is
