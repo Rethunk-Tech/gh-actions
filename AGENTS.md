@@ -241,13 +241,12 @@ from a live URL has no equivalent pin.
 
 ## Gate budget
 
-Measured at load average 27 to 30 on 32 cores, so judge on CPU. `gate` runs actionlint over the
+Budget: 10 s warm, 30 s cold; judge on CPU, since load from other work skews wall time. `gate` runs actionlint over the
 workflows and, for each of the twelve test fixtures `gate --list` runs under `.github/test-fixtures/`
 (`rust-app-broken` and `rust-app-unformatted` included), the
 fixture's own checks (biome for the JS ones; build, golangci-lint, test and govulncheck chained in
 one command for `go-app`, so the Go steps share one compile). The CI jobs that exercise the composite
-actions themselves need a GitHub runner and are not reproducible locally. Warm: 1.2 to 2.2 s wall,
-5 CPU-s. Cold (fresh `GOCACHE`, `XDG_CACHE_HOME` and golangci-lint cache): 4.8 s wall, 28 CPU-s, the
-`go-app` chain being the slowest step. No oversubscription and no duplicated steps.
+actions themselves need a GitHub runner and are not reproducible locally. The `go-app` chain is the
+slowest step cold. No oversubscription and no duplicated steps.
 
-`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing), `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`), and the lint job's action.yml schema, undeclared-input, and tracked-fixture checks. It also lists the fixtures that are broken on purpose (`python-app-broken`, `python-app-failing`, `python-app-unformatted`, `python-app-vulnerable`, `rust-app-failing`, `bun-app-failing`, `go-app-failing`, `go-app-vulnerable`) under `[detect] exclude`, because gate gates every directory CI names via `working-directory` and those fail by design. `go-app-failing` is listed even though CI only passes it as `go-version-file` (detection would not pick it up as a working-directory the way it does the others). `go-app-vulnerable` is listed because govulncheck is in the go-app chain. `bun-app-vulnerable` is not excluded: biome and `bun test` still pass; only the audit gate fails. Warm with v0.6.5: 1.1 s wall, 4.7 CPU-s.
+`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing), `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`), and the lint job's action.yml schema, undeclared-input, and tracked-fixture checks. It also lists the fixtures that are broken on purpose (`python-app-broken`, `python-app-failing`, `python-app-unformatted`, `python-app-vulnerable`, `rust-app-failing`, `bun-app-failing`, `go-app-failing`, `go-app-vulnerable`) under `[detect] exclude`, because gate gates every directory CI names via `working-directory` and those fail by design. `go-app-failing` is listed even though CI only passes it as `go-version-file` (detection would not pick it up as a working-directory the way it does the others). `go-app-vulnerable` is listed because govulncheck is in the go-app chain. `bun-app-vulnerable` is not excluded: biome and `bun test` still pass; only the audit gate fails.
