@@ -183,6 +183,8 @@ to get wrong when writing that kind of test:
   On a cold self-test run, assert `cache-hit != 'true'` — not emptiness, which would reject
   the harmless partial-match case when another fixture saved first in parallel.
 
+**A cache step is a speed-up, never a gate.** Nothing to save, a failed save or a failed restore warns and the job goes on; only the work the cache stands in for can fail the job. Match what goes into a cache by what the tool actually wrote, not by one source: the Supabase CLI pulls from ghcr.io and falls back to ECR, so a save step that listed only ECR images passed `docker save` no arguments and failed every Supabase job in three repos.
+
 ## The one design decision worth understanding before touching `setup-nextjs-bun`
 
 `setup-nextjs-bun` does not compose `setup-bun`, even though GitHub's `$/` syntax would allow
