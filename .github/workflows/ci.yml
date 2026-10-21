@@ -673,6 +673,31 @@ jobs:
             exit 1
           fi
 
+  # The prune forked a stat per file, which took 280s on a Windows runner (claude-format-hooks); this proves the batched
+  # script on the Git Bash tools a Windows caller gets, without a cold/warm pair's minutes.
+  test-setup-go-prune-windows:
+    name: setup-go prune (windows)
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - shell: bash
+        run: |
+          set -euo pipefail
+          cache="$RUNNER_TEMP/go build"
+          now=$(date +%s)
+          for entry in ab/new-d:0 ab/hour-d:3600 cd/edge-d:7100 cd/old-d:7300 ef/week-d:604800; do
+            name=${entry%%:*}
+            mkdir -p "$cache/$(dirname "$name")"
+            touch -d "@$((now - ${entry##*:}))" "$cache/$name"
+          done
+          bash setup-go/prune-build-cache.sh "$cache"
+          left=$(cd "$cache" && find . -type f | sort | tr '\n' ' ')
+          if [ "$left" != "./ab/hour-d ./ab/new-d ./cd/edge-d " ]; then
+            echo "::error::prune left: $left" >&2
+            exit 1
+          fi
+
   # cache-build false stores modules only. Inner cache steps are invisible to the caller, so
   # cache-mode is the assertion the job can actually read. No second cold/warm pair: the
   # default path above still covers exact-key restore of the combined cache.

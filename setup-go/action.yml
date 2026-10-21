@@ -245,18 +245,7 @@ runs:
       if: inputs.cache-build != 'false'
       shell: bash
       run: |
-        [ -d "$SETUP_GO_BUILD_CACHE" ] || exit 0
-        # One batched stat over the cache: a fork per file took 96s on a 2 GB cache (mortar).
-        # Cache entry names are hex, so a path never holds a space.
-        list="$RUNNER_TEMP/go-build-mtimes"
-        find "$SETUP_GO_BUILD_CACHE" -type f -exec stat -c '%Y %n' {} + >"$list" 2>/dev/null \
-          || find "$SETUP_GO_BUILD_CACHE" -type f -exec stat -f '%m %N' {} + >"$list"
-        newest=$(awk '$1 > m { m = $1 } END { print m + 0 }' "$list")
-        [ "$newest" -gt 0 ] || exit 0
-        before=$(du -sm "$SETUP_GO_BUILD_CACHE" | cut -f1)
-        awk -v cutoff=$((newest - 7200)) '$1 < cutoff { print $2 }' "$list" | xargs rm -f
-        rm -f "$list"
-        echo "Go build cache pruned from ${before} MB to $(du -sm "$SETUP_GO_BUILD_CACHE" | cut -f1) MB"
+        bash "$GITHUB_ACTION_PATH/prune-build-cache.sh" "$SETUP_GO_BUILD_CACHE"
 
     # The golangci-lint binary is downloaded rather than cached: the release fetch measured
     # 0.6s (bastion-mfa), no faster than a cache round trip. Its own analysis cache is filled
