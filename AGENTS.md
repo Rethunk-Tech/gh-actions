@@ -152,9 +152,6 @@ to get wrong when writing that kind of test:
   restore/save; without it, cache steps are effectively no-ops in local testing.
 - Any test fixture created for local iteration stays untracked/cleaned up before committing —
   `.github/test-fixtures/` is the one committed exception, used by `ci.yml`'s own self-test.
-- **A warm leg first waits for its cold leg's cache to be listed** (`scripts/wait-for-cache.sh`, keyed by a
-  prefix and a suffix the workflow can compute: the job id, a lockfile hash, the Playwright pin). A cache saved in
-  the cold leg's post step can take seconds to become restorable, and a warm leg that starts sooner misses it.
 - **`setup-go`'s cold/warm pair is one job with a two-leg `max-parallel: 1` matrix**, not two
   jobs: its cache key contains `github.job`, so two differently-named jobs never share an
   exact key.

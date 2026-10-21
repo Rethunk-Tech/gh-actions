@@ -191,17 +191,8 @@ jobs:
     needs: test-setup-bun-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREFIX: Linux-bun-
-          SUFFIX: ${{ hashFiles('.github/test-fixtures/bun-app/bun.lock') }}
-        run: scripts/wait-for-cache.sh "$PREFIX" "$SUFFIX"
       - id: setup
         uses: ./setup-bun
         with:
@@ -244,17 +235,8 @@ jobs:
     needs: test-setup-bun-extra-cache-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREFIX: Linux-bun-extra-${{ github.sha }}
-          SUFFIX: ""
-        run: scripts/wait-for-cache.sh "$PREFIX" "$SUFFIX"
       - uses: ./setup-bun
         with:
           working-directory: .github/test-fixtures/bun-app
@@ -484,17 +466,8 @@ jobs:
     needs: test-setup-nextjs-bun-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREFIX: Linux-nextjs-${{ hashFiles('.github/test-fixtures/nextjs-app/bun.lock') }}-
-          SUFFIX: ""
-        run: scripts/wait-for-cache.sh "$PREFIX" "$SUFFIX"
       - id: setup
         uses: ./setup-nextjs-bun
         with:
@@ -532,17 +505,8 @@ jobs:
       - test-setup-nextjs-bun-next-app-dir-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREFIX: Linux-nextjs-${{ hashFiles('.github/test-fixtures/nextjs-workspace/bun.lock') }}-
-          SUFFIX: ""
-        run: scripts/wait-for-cache.sh "$PREFIX" "$SUFFIX"
       - uses: ./setup-nextjs-bun
         with:
           working-directory: .github/test-fixtures/nextjs-workspace
@@ -586,17 +550,8 @@ jobs:
     needs: test-setup-nextjs-bun-extra-cache-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREFIX: Linux-bun-extra-${{ github.sha }}-nextjs
-          SUFFIX: ""
-        run: scripts/wait-for-cache.sh "$PREFIX" "$SUFFIX"
       - uses: ./setup-nextjs-bun
         with:
           working-directory: .github/test-fixtures/nextjs-app
@@ -652,16 +607,8 @@ jobs:
     needs: test-setup-nextjs-bun-playwright-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PACKAGE: .github/test-fixtures/nextjs-app-playwright/package.json
-        run: scripts/wait-for-cache.sh "playwright-Linux-$(jq -r '.devDependencies["@playwright/test"] // .dependencies["@playwright/test"]' "$PACKAGE")"
       - id: setup
         uses: ./setup-nextjs-bun
         with:
@@ -689,22 +636,12 @@ jobs:
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     strategy:
       max-parallel: 1
       matrix:
         phase: [cold, warm]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        if: matrix.phase == 'warm'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREFIX: setup-go-Linux-
-          SUFFIX: -${{ github.job }}
-        run: scripts/wait-for-cache.sh "$PREFIX" "$SUFFIX"
       - id: setup
         uses: ./setup-go
         with:
@@ -806,22 +743,12 @@ jobs:
     needs: reset-self-test-caches
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     strategy:
       max-parallel: 1
       matrix:
         phase: [cold, warm]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        if: matrix.phase == 'warm'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREFIX: setup-rust-Linux-
-          SUFFIX: -${{ github.job }}
-        run: scripts/wait-for-cache.sh "$PREFIX" "$SUFFIX"
       - id: setup
         uses: ./setup-rust
         with:
@@ -1091,16 +1018,8 @@ jobs:
     needs: test-setup-bun-playwright-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PACKAGE: .github/test-fixtures/bun-app-playwright/package.json
-        run: scripts/wait-for-cache.sh "playwright-Linux-$(jq -r '.devDependencies["@playwright/test"] // .dependencies["@playwright/test"]' "$PACKAGE")"
       - id: setup
         uses: ./setup-bun
         with:
@@ -1166,16 +1085,8 @@ jobs:
     needs: test-setup-bun-playwright-directory-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PACKAGE: .github/test-fixtures/bun-workspace-playwright/apps/web/package.json
-        run: scripts/wait-for-cache.sh "playwright-Linux-$(jq -r '.devDependencies["@playwright/test"] // .dependencies["@playwright/test"]' "$PACKAGE")"
       - id: setup
         uses: ./setup-bun
         with:
@@ -1443,17 +1354,8 @@ jobs:
     needs: test-setup-python-cold
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    permissions:
-      contents: read
-      actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Wait for the cold leg's cache to be listed
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PREFIX: setup-uv-
-          SUFFIX: ""
-        run: scripts/wait-for-cache.sh "$PREFIX" "$SUFFIX"
       - id: setup
         uses: ./setup-python
         with:
