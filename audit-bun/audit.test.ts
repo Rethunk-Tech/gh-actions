@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test";
-import { annotation, classify, latestVersion, type Report } from "./audit.ts";
+import {
+	annotation,
+	classify,
+	ghsaOf,
+	latestVersion,
+	parseIgnores,
+	type Report,
+} from "./audit.ts";
 
 const advisory = (vulnerable_versions: string) => ({
 	id: 1,
@@ -122,4 +129,20 @@ test("a failed or versionless registry response counts as unknown latest", async
 	} finally {
 		globalThis.fetch = orig;
 	}
+});
+
+test("ignore lines need a GHSA id and a reason; comments and blanks are skipped", () => {
+	const ignores = parseIgnores(
+		"# upstream pins zod 3\nGHSA-mrhx-c7xc-m3w5 @expo/cli requires zod ^3\n\n",
+	);
+	expect([...ignores]).toEqual([["GHSA-mrhx-c7xc-m3w5", "@expo/cli requires zod ^3"]]);
+	expect(() => parseIgnores("GHSA-mrhx-c7xc-m3w5")).toThrow(TypeError);
+	expect(() => parseIgnores("CVE-2026-1 reason")).toThrow(TypeError);
+});
+
+test("the GHSA id comes from the advisory url", () => {
+	expect(ghsaOf(advisory("<1"))).toBeUndefined();
+	expect(
+		ghsaOf({ ...advisory("<1"), url: "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5" }),
+	).toBe("GHSA-mrhx-c7xc-m3w5");
 });

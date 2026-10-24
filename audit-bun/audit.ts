@@ -1,4 +1,4 @@
-// Fails only on advisories whose fix has shipped; the rest warn with the dependency chain.
+// Fails only on advisories whose fix has shipped and the repo has not ignored; the rest warn.
 
 interface Advisory {
 	id: number;
@@ -55,6 +55,28 @@ export function classify(
 	return { fixable, unfixable };
 }
 
+/** `.bun-audit-ignore`: one `GHSA-xxxx-xxxx-xxxx reason` per line; `#` starts a comment. */
+export function parseIgnores(text: string): Map<string, string> {
+	const ignores = new Map<string, string>();
+	for (const raw of text.split("\n")) {
+		const line = raw.replace(/#.*/, "").trim();
+		if (line === "") {
+			continue;
+		}
+		const [id = "", ...words] = line.split(/\s+/);
+		if (!/^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/.test(id) || words.length === 0) {
+			throw new TypeError(
+				`.bun-audit-ignore: ${JSON.stringify(raw)} is not "GHSA-id reason"`,
+			);
+		}
+		ignores.set(id, words.join(" "));
+	}
+	return ignores;
+}
+
+export const ghsaOf = (advisory: Advisory): string | undefined =>
+	/GHSA(-[23456789cfghjmpqrvwx]{4}){3}/.exec(advisory.url)?.[0];
+
 /** Workflow commands end at the first newline, so a multi-line message is percent-encoded. */
 export const annotation = (
 	level: "error" | "warning",
@@ -108,7 +130,38 @@ async function main(): Promise<number> {
 	const names = Object.keys(report);
 	const versions = await Promise.all(names.map((n) => latestVersion(n)));
 	const latest = Object.fromEntries(names.map((n, i) => [n, versions[i]]));
-	const { fixable, unfixable } = classify(report, latest);
+	const ignoreFile = Bun.file(".bun-audit-ignore");
+	const ignores = parseIgnores(
+		(await ignoreFile.exists()) ? await ignoreFile.text() : "",
+	);
+	const classified = classify(report, latest);
+	const seen = new Set<string>();
+	const fixable = classified.fixable.filter((f) => {
+		const id = ghsaOf(f.advisory);
+		const reason = id === undefined ? undefined : ignores.get(id);
+		if (id === undefined || reason === undefined) {
+			return true;
+		}
+		seen.add(id);
+		console.log(
+			annotation("warning", `${f.pkg}: ${id} ignored by .bun-audit-ignore: ${reason}`),
+		);
+		return false;
+	});
+	const { unfixable } = classified;
+	for (const f of unfixable) {
+		const id = ghsaOf(f.advisory);
+		if (id !== undefined) {
+			seen.add(id);
+		}
+	}
+	for (const id of ignores.keys()) {
+		if (!seen.has(id)) {
+			console.log(
+				annotation("warning", `.bun-audit-ignore: ${id} matches no advisory; remove it`),
+			);
+		}
+	}
 
 	for (const f of unfixable) {
 		const chain = await why(f.pkg);

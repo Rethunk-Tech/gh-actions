@@ -3,6 +3,8 @@ description: >
   Run `bun audit --json` and fail only on advisories whose fix has shipped: the package's latest
   published version lies outside the advisory's vulnerable range. An advisory with no patched
   release prints as a warning with its `bun why` dependency chain and does not fail the job.
+  A `.bun-audit-ignore` in the working directory (`GHSA-id reason` per line) turns a fixable
+  advisory into a warning; an entry that matches no advisory warns so it gets removed.
   Needs Bun on PATH (setup-bun) and a prior install is not required.
 
 inputs:
