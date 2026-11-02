@@ -34,6 +34,14 @@ inputs:
       that never compiles sets this false. Default true keeps the module and build caches.
     required: false
     default: "true"
+  cache-key-suffix:
+    description: >
+      Appended to the build cache's primary key only (restore falls back to the suffix-free
+      prefix). On a repo whose go.mod is stable the primary key otherwise always hits and a hit
+      never saves, freezing the build cache at its first save; pass a value that changes on the
+      caller's refresh schedule (e.g. the date) to save a fresh one. Empty keeps the key unchanged.
+    required: false
+    default: ""
   run-test-race:
     description: >
       When true, runs `go test -race ./...` from the module directory after the toolchain is set
@@ -219,7 +227,7 @@ runs:
         path: |
           ${{ env.SETUP_GO_MOD_CACHE }}
           ${{ env.SETUP_GO_BUILD_CACHE }}
-        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-${{ github.job }}
+        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-${{ github.job }}${{ inputs.cache-key-suffix && format('-{0}', inputs.cache-key-suffix) || '' }}
         restore-keys: |
           setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-
           setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-

@@ -20,6 +20,11 @@ class SetupGoCacheKey(unittest.TestCase):
         self.assertIn("hashFiles(inputs.cache-dependency-path)", ACTION)
         self.assertIn("sha256sum", ACTION)
 
+    def test_suffix_is_empty_by_default_and_on_the_primary_key_only(self) -> None:
+        self.assertEqual(ACTION.count("inputs.cache-key-suffix &&"), 1)
+        key = next(l for l in ACTION.splitlines() if l.strip().startswith("key: setup-go-${{ runner.os"))
+        self.assertIn("inputs.cache-key-suffix", key)
+
 
 class SetupGoBuildCachePrune(unittest.TestCase):
     def test_prune_is_not_linux_only(self) -> None:

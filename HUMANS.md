@@ -146,6 +146,7 @@ plain suite.
     # go-version: "1.26.5"           # exact version instead — overrides go-version-file
     # cache-dependency-path: "**/go.sum"  # default: the go.sum next to go-version-file, plus go-version-file
     # cache-build: "false"
+    # cache-key-suffix: ${{ steps.day.outputs.date }}  # refresh the build cache on this schedule
 ```
 
 Outputs: `go-version`, `cache-hit` (an exact key match for this job), `cache-mode` (`build` when the module and build caches are stored, `modules` when `cache-build` is `"false"`), and `test-outcome`, `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
@@ -156,6 +157,8 @@ the race-test cache. A job's first run, or a dependency bump, falls back to the 
 job saved for the same Go version. Matrix legs share one job id and therefore one cache entry.
 
 `cache-build` defaults to true. Set it to `"false"` to store the module cache only (no build cache, no prune).
+
+`cache-key-suffix` (default empty) is appended to the build cache's primary key only; restore still falls back to the suffix-free prefix. A repo with a stable `go.mod` always hits the primary key, and a hit never saves, so its build cache freezes at the first save; a suffix that changes daily (`echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"` in an earlier step) saves a fresh one each day.
 
 **Test gate** — set `run-test` to `"true"` in the job that owns the module's plain test gate.
 It runs `go test ./...` from the module directory: `cache-dependency-path` wins when it is
