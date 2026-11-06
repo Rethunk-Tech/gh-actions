@@ -296,9 +296,10 @@ cache keyed per job.
     # run-clippy: "true"                 # default false
     # run-fmt: "true"                    # default false; separate from run-clippy
     # run-test: "true"                   # default false; separate from run-clippy and run-fmt
+    # run-audit: "true"                  # default false; cargo-audit against Cargo.lock
 ```
 
-Outputs: `cache-hit` (an exact key match for this job), `clippy-outcome`, `fmt-outcome`, and `test-outcome` (`success`, `failure`, or `skipped` when that input is off).
+Outputs: `cache-hit` (an exact key match for this job), `clippy-outcome`, `fmt-outcome`, `test-outcome`, and `audit-outcome` (`success`, `failure`, or `skipped` when that input is off).
 
 **Clippy gate** — runs `cargo clippy --locked --all-targets -- -D warnings` from
 `working-directory`, with `continue-on-error` on that step and a final gate step, same shape as
@@ -317,12 +318,19 @@ keeps its own step and leaves `run-fmt` unset.
 separate from `run-clippy` and `run-fmt`, which do not run the test suite. A caller whose
 invocation differs keeps its own step and leaves `run-test` unset.
 
+**Audit gate** — downloads a pinned, checksum-verified `cargo-audit` binary (Linux and macOS
+runners) and runs `cargo-audit audit` from `working-directory` against `Cargo.lock`, failing on any
+vulnerability advisory. It needs no compiled project, and it is not clippy: clippy lints, this checks
+dependencies. Same `continue-on-error` and summary-table shape as the other gates. Off by default.
+A caller whose invocation differs keeps its own step and leaves `run-audit` unset.
+
 ```yaml
 - uses: Rethunk-Tech/gh-actions/setup-rust@v1.18
   with:
     run-clippy: "true"
     run-fmt: "true"
     run-test: "true"
+    run-audit: "true"
     # working-directory: .
 ```
 

@@ -72,11 +72,11 @@ trusting the counts already written above.
   `setup-bun`'s opt-in `run-test` always runs `bun test`.
   **Lint/security-gate steps are the other deliberate exception**
   (`setup-go`'s opt-in `run-lint`/`run-fmt`/`run-govulncheck`, `setup-python`'s
-  `run-ruff`/`run-ruff-format`/`run-audit`, `setup-rust`'s `run-clippy`/`run-fmt`, and
+  `run-ruff`/`run-ruff-format`/`run-audit`, `setup-rust`'s `run-clippy`/`run-fmt`/`run-audit`, and
   `setup-bun`'s `run-audit`, all off by default):
   unlike build/test, every real fleet caller invokes the exact same tools for its language
   (`golangci-lint` and `govulncheck` for Go; `ruff` and `uv audit` for Python;
-  `cargo clippy --locked --all-targets -- -D warnings` and `cargo fmt --all -- --check` for Rust;
+  `cargo clippy --locked --all-targets -- -D warnings`, `cargo fmt --all -- --check` and `cargo audit` for Rust;
   `audit-bun/audit.ts` for Bun).
   Go and Python vary only version/args — real passthrough inputs, not a project-defined verb — and Rust's and Bun's commands
   do not vary at all. `setup-bun` calls `audit-bun/audit.ts` rather than keeping a second auditor. Centralizing them converges the fleet onto one reviewed SHA pin instead of
@@ -136,7 +136,7 @@ before committing, and in CI via `.github/workflows/ci.yml`'s self-test jobs (`t
 rather than silently no-op'ing — `go-app-broken` (an errcheck violation), `go-app-failing` (one test fails without `-race`), and `python-app-broken`
 (an F401 unused import), `go-app-race` (a data race), `go-app-unformatted` (lint-clean, not gofmt-formatted), `python-app-unformatted` (lint-clean, not
 ruff-formatted), `rust-app-broken` (a `len_zero` warning), `rust-app-unformatted` (clippy-clean, not
-rustfmt-formatted), `rust-app-failing` (clippy-clean and rustfmt-clean, one test panics), `python-app-failing` (one pytest assertion fails), `python-app-vulnerable` (jinja2 3.1.3, advisories with shipped fixes), `go-app-vulnerable` (golang-jwt/jwt v4.5.0, advisories with shipped fixes), `bun-app-vulnerable` (lodash 4.17.20, an advisory with a shipped fix, shared
+rustfmt-formatted), `rust-app-failing` (clippy-clean and rustfmt-clean, one test panics), `rust-app-vulnerable` (smallvec 1.6.0, RUSTSEC-2021-0003 with a shipped fix), `python-app-failing` (one pytest assertion fails), `python-app-vulnerable` (jinja2 3.1.3, advisories with shipped fixes), `go-app-vulnerable` (golang-jwt/jwt v4.5.0, advisories with shipped fixes), `bun-app-vulnerable` (lodash 4.17.20, an advisory with a shipped fix, shared
 with `audit-bun`), and `bun-app-failing` (one `bun test` assertion fails); each compiles/imports and passes
 without its gate, so only the gate can catch it. A few things that are easy
 to get wrong when writing that kind of test:
@@ -235,4 +235,4 @@ one command for `go-app`, so the Go steps share one compile). The CI jobs that e
 actions themselves need a GitHub runner and are not reproducible locally. The `go-app` chain is the
 slowest step cold. No oversubscription and no duplicated steps.
 
-`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing), `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`), and the lint job's action.yml schema, undeclared-input, and tracked-fixture checks. It also lists the fixtures that are broken on purpose (`python-app-broken`, `python-app-failing`, `python-app-unformatted`, `python-app-vulnerable`, `rust-app-failing`, `bun-app-failing`, `go-app-failing`, `go-app-vulnerable`) under `[detect] exclude`, because gate gates every directory CI names via `working-directory` and those fail by design. `go-app-failing` is listed even though CI only passes it as `go-version-file` (detection would not pick it up as a working-directory the way it does the others). `go-app-vulnerable` is listed because govulncheck is in the go-app chain. `bun-app-vulnerable` is not excluded: biome and `bun test` still pass; only the audit gate fails.
+`.gate.toml` adds the repository-root checks detection cannot see: `bun test audit-bun` (gate's own CI-coverage warning reported it missing), `python3 scripts/check-setup-bun-drift.py` (shared steps between `setup-bun` and `setup-nextjs-bun`), and the lint job's action.yml schema, undeclared-input, and tracked-fixture checks. It also lists the fixtures that are broken on purpose (`python-app-broken`, `python-app-failing`, `python-app-unformatted`, `python-app-vulnerable`, `rust-app-failing`, `rust-app-vulnerable`, `bun-app-failing`, `go-app-failing`, `go-app-vulnerable`) under `[detect] exclude`, because gate gates every directory CI names via `working-directory` and those fail by design. `go-app-failing` is listed even though CI only passes it as `go-version-file` (detection would not pick it up as a working-directory the way it does the others). `go-app-vulnerable` is listed because govulncheck is in the go-app chain. `bun-app-vulnerable` is not excluded: biome and `bun test` still pass; only the audit gate fails.

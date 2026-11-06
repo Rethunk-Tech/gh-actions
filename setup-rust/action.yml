@@ -2,8 +2,8 @@ name: Setup Rust
 description: >
   Install a Rust toolchain with the runner's preinstalled rustup — from rust-toolchain.toml or an
   explicit channel — plus components and targets, and cache the cargo registry, git
-  dependencies and target/ per job. Optionally run cargo clippy, cargo fmt, and/or
-  cargo test as gates on the same job — opt-in, off by default.
+  dependencies and target/ per job. Optionally run cargo clippy, cargo fmt,
+  cargo test, and/or cargo audit as gates on the same job — opt-in, off by default.
 
 inputs:
   toolchain:
@@ -48,6 +48,13 @@ inputs:
       Separate from run-clippy and run-fmt, which do not run the test suite. Off by default.
     required: false
     default: "false"
+  run-audit:
+    description: >
+      When true, downloads a checksum-verified cargo-audit binary and runs `cargo-audit audit`
+      from working-directory against Cargo.lock, failing on any vulnerability advisory. Does not
+      need a compiled project. Linux and macOS runners only. Off by default.
+    required: false
+    default: "false"
 
 outputs:
   cache-hit:
@@ -62,6 +69,9 @@ outputs:
   test-outcome:
     description: Outcome of the cargo test gate (success, failure, or skipped when run-test is off).
     value: ${{ steps.test.outcome }}
+  audit-outcome:
+    description: Outcome of the cargo audit gate (success, failure, or skipped when run-audit is off).
+    value: ${{ steps.audit.outcome }}
 
 runs:
   using: composite
@@ -194,16 +204,70 @@ runs:
       working-directory: ${{ inputs.working-directory }}
       run: cargo test --locked --all-targets
 
-    - name: Gate on clippy, fmt, and test results
-      if: inputs.run-clippy == 'true' || inputs.run-fmt == 'true' || inputs.run-test == 'true'
+    # Not continue-on-error: a failed download or checksum mismatch is an infrastructure
+    # failure, and must not be reported by the gate below as an advisory. rustsec publishes no
+    # checksums file, so the digests are pinned here, taken from the release asset digests;
+    # bumping CARGO_AUDIT_VERSION means replacing all four.
+    - name: Install cargo-audit
+      id: audit-install
+      if: inputs.run-audit == 'true'
+      shell: bash
+      env:
+        OS_NAME: ${{ runner.os }}
+        ARCH_NAME: ${{ runner.arch }}
+      run: |
+        set -u
+        . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
+        version=0.22.2
+        case "$OS_NAME/$ARCH_NAME" in
+          Linux/X64)
+            target=x86_64-unknown-linux-musl
+            sha256=7fb9497f8594b389e5fce5ef9b92db08432996895b2e0c5a0167a69ed445c428 ;;
+          Linux/ARM64)
+            target=aarch64-unknown-linux-gnu
+            sha256=c6603814ddaa45e51263dafd31c0ac98808f688d26f7395804f9670b0fd599dd ;;
+          macOS/X64)
+            target=x86_64-apple-darwin
+            sha256=847831323de932155b226ab60ee4a180e13e5d007a019f0d4b7b4d89a6de2ab2 ;;
+          macOS/ARM64)
+            target=aarch64-apple-darwin
+            sha256=ec7ca4263769593df4d909be85b94a6b79efa2897be5d2bb8ebd516e823175af ;;
+          *)
+            echo "::error::$(github_encode "run-audit has no cargo-audit release for $OS_NAME $ARCH_NAME runners")" >&2
+            exit 1 ;;
+        esac
+        base="cargo-audit-$target-v$version"
+        dir="$RUNNER_TEMP/setup-rust-cargo-audit"
+        mkdir -p "$dir"
+        cd "$dir" || exit 1
+        curl -fsSL --max-time 60 --retry 5 --retry-all-errors --retry-max-time 120 -o "$base.tgz" \
+          "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv$version/$base.tgz"
+        echo "$sha256  $base.tgz" | shasum -a 256 -c -
+        tar -xzf "$base.tgz"
+        echo "bin=$dir/$base/cargo-audit" >> "$GITHUB_OUTPUT"
+
+    - name: cargo audit
+      id: audit
+      if: inputs.run-audit == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        CARGO_AUDIT: ${{ steps.audit-install.outputs.bin }}
+      run: '"$CARGO_AUDIT" audit'
+
+    - name: Gate on clippy, fmt, test, and audit results
+      if: inputs.run-clippy == 'true' || inputs.run-fmt == 'true' || inputs.run-test == 'true' || inputs.run-audit == 'true'
       shell: bash
       env:
         RUN_CLIPPY: ${{ inputs.run-clippy }}
         RUN_FMT: ${{ inputs.run-fmt }}
         RUN_TEST: ${{ inputs.run-test }}
+        RUN_AUDIT: ${{ inputs.run-audit }}
         CLIPPY_OUTCOME: ${{ steps.clippy.outcome }}
         FMT_OUTCOME: ${{ steps.fmt.outcome }}
         TEST_OUTCOME: ${{ steps.test.outcome }}
+        AUDIT_OUTCOME: ${{ steps.audit.outcome }}
       run: |
         row() {
           local enabled="$1" outcome="$2" label="$3"
@@ -216,13 +280,14 @@ runs:
           fi
         }
         {
-          echo "## setup-rust clippy/fmt/test gate"
+          echo "## setup-rust clippy/fmt/test/audit gate"
           echo "| Check | Result |"
           echo "| --- | --- |"
         } >> "$GITHUB_STEP_SUMMARY"
         row "$RUN_CLIPPY" "$CLIPPY_OUTCOME" "cargo clippy"
         row "$RUN_FMT" "$FMT_OUTCOME" "cargo fmt --all -- --check"
         row "$RUN_TEST" "$TEST_OUTCOME" "cargo test --locked --all-targets"
+        row "$RUN_AUDIT" "$AUDIT_OUTCOME" "cargo audit"
 
         failed=0
         if [ "$CLIPPY_OUTCOME" = "failure" ]; then
@@ -235,6 +300,10 @@ runs:
         fi
         if [ "$TEST_OUTCOME" = "failure" ]; then
           echo "::error::cargo test --locked --all-targets failed — see the cargo test step above" >&2
+          failed=1
+        fi
+        if [ "$AUDIT_OUTCOME" = "failure" ]; then
+          echo "::error::cargo audit found vulnerabilities — see the cargo audit step above" >&2
           failed=1
         fi
         exit "$failed"

@@ -58,5 +58,6 @@ exclude = [
   "python-app-unformatted",
   "python-app-vulnerable",
   "rust-app-failing",
+  "rust-app-vulnerable",
   "bun-app-failing",
 ]

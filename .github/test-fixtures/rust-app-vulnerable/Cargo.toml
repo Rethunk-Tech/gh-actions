@@ -1,0 +1,8 @@
+[package]
+name = "gh-actions-test-fixture-rust-vulnerable"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+smallvec = "=1.6.0"

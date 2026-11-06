@@ -951,6 +951,38 @@ jobs:
             exit 1
           fi
 
+  # Proves the run-audit gate on both sides: the clean fixture's Cargo.lock passes, and smallvec 1.6.0
+  # (RUSTSEC-2021-0003, fixed in 1.6.1) fails it with clippy, fmt and test left off.
+  test-setup-rust-audit:
+    name: setup-rust self-test (audit gate passes clean, fires on advisory)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: clean
+        uses: ./setup-rust
+        with:
+          working-directory: .github/test-fixtures/rust-app
+          run-audit: "true"
+      - id: vulnerable
+        continue-on-error: true
+        uses: ./setup-rust
+        with:
+          working-directory: .github/test-fixtures/rust-app-vulnerable
+          run-audit: "true"
+      - name: assert the audit gate passed clean and failed on the advisory
+        env:
+          CLEAN: ${{ steps.clean.outputs.audit-outcome }}
+          OUTCOME: ${{ steps.vulnerable.outcome }}
+          AUDIT: ${{ steps.vulnerable.outputs.audit-outcome }}
+          CLIPPY: ${{ steps.vulnerable.outputs.clippy-outcome }}
+        run: |
+          if [ "$CLEAN" != "success" ] || [ "$OUTCOME" != "failure" ] || [ "$AUDIT" != "failure" ] || [ "$CLIPPY" != "skipped" ]; then
+            echo "::error::expected clean audit 'success' and a vulnerable composite 'failure' with audit 'failure' and clippy 'skipped', got clean '$CLEAN', composite '$OUTCOME', audit '$AUDIT', clippy '$CLIPPY'" >&2
+            exit 1
+          fi
+
   # audit-bun fails only on an advisory with a shipped fix. The pure split (fixable vs no patched
   # release) is unit-tested; the fixture proves the gate fires on a real, fixable advisory
   # (lodash 4.17.20) and stays quiet on a clean tree.
