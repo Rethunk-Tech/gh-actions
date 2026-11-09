@@ -28,6 +28,12 @@ inputs:
       Leave empty to default to the go.sum next to go-version-file plus go-version-file itself.
     required: false
     default: ""
+  cache:
+    description: >
+      When false, restore and save no Go cache at all. Release workflows set this false so a
+      poisoned cache entry can't reach a published artifact; everything else keeps the default.
+    required: false
+    default: "true"
   cache-build:
     description: >
       When false, cache the module download cache only and skip the build-cache prune. A job
@@ -108,9 +114,9 @@ outputs:
     value: ${{ steps.go-cache.outputs.cache-hit || steps.go-mod-cache.outputs.cache-hit }}
   cache-mode:
     description: >
-      `build` when the module and build caches are stored (the default), or `modules` when
-      cache-build is false and only the module cache is stored.
-    value: ${{ inputs.cache-build == 'false' && 'modules' || 'build' }}
+      `build` when the module and build caches are stored (the default), `modules` when
+      cache-build is false and only the module cache is stored, or `off` when cache is false.
+    value: ${{ inputs.cache == 'false' && 'off' || (inputs.cache-build == 'false' && 'modules' || 'build') }}
   test-race-outcome:
     description: Outcome of the `go test -race` gate (success, failure or skipped when run-test-race is off).
     value: ${{ steps.test-race.outcome }}
@@ -221,7 +227,7 @@ runs:
     # what that fallback carries forward.
     - name: Cache Go modules and build cache
       id: go-cache
-      if: inputs.cache-build != 'false'
+      if: inputs.cache != 'false' && inputs.cache-build != 'false'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
@@ -234,7 +240,7 @@ runs:
 
     - name: Cache Go modules
       id: go-mod-cache
-      if: inputs.cache-build == 'false'
+      if: inputs.cache != 'false' && inputs.cache-build == 'false'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.SETUP_GO_MOD_CACHE }}
@@ -250,7 +256,7 @@ runs:
     # bump); keep those and drop the rest. A job over two hours long can lose some of its own
     # entries, which costs a rebuild of them, not correctness.
     - name: Prune build cache to the saving job's working set
-      if: inputs.cache-build != 'false'
+      if: inputs.cache != 'false' && inputs.cache-build != 'false'
       shell: bash
       run: |
         bash "$GITHUB_ACTION_PATH/prune-build-cache.sh" "$SETUP_GO_BUILD_CACHE"
