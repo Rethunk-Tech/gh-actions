@@ -9,8 +9,7 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,6 +20,8 @@ jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: write
     steps:
       # fetch-depth: 0 brings the annotated tag OBJECT, not just the commit it points at —
       # `git tag -l --format=%(contents:...)` reads the annotation, and a shallow checkout has
