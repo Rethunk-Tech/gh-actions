@@ -571,7 +571,7 @@ jobs:
             exit 1
           fi
 
-  # Distinct Playwright version (1.55.1) so playwright-${{ runner.os }}-${version} keys do not
+  # Distinct Playwright version (1.65.0) so playwright-${{ runner.os }}-${version} keys do not
   # collide with setup-bun's 1.64.1 fixture: sharing one version would make a parallel
   # cold pair race one cache key.
   test-setup-nextjs-bun-playwright-cold:
@@ -596,8 +596,8 @@ jobs:
             echo "::error::expected Playwright browsers installed under ~/.cache/ms-playwright" >&2
             exit 1
           fi
-          if [ "$PW_VERSION" != "1.55.1" ]; then
-            echo "::error::expected playwright-version=1.55.1 (distinct from setup-bun's 1.64.1 fixture so the cache keys cannot collide), got '$PW_VERSION'" >&2
+          if [ "$PW_VERSION" != "1.65.0" ]; then
+            echo "::error::expected playwright-version=1.65.0 (distinct from setup-bun's 1.64.1 fixture so the cache keys cannot collide), got '$PW_VERSION'" >&2
             exit 1
           fi
           if [ "$PW_CACHE_HIT" = "true" ]; then
@@ -1077,7 +1077,7 @@ jobs:
   # playwright-directory is the Bastion/caldera/prepaudit shape: bun.lock (and skip-install) at
   # the workspace root, @playwright/test pinned only under apps/web. Resolving against the root
   # package.json would cache as "unpinned" and never invalidate on a browser bump. Distinct
-  # 1.52.0 so this pair cannot collide with the 1.64.1 / 1.55.1 Playwright self-tests.
+  # 1.63.0 so this pair cannot collide with the 1.64.1 / 1.65.0 Playwright self-tests.
   test-setup-bun-playwright-directory-cold:
     name: setup-bun self-test (playwright-directory, skip-install, cold)
     needs: reset-self-test-caches
@@ -1098,8 +1098,8 @@ jobs:
           PW_CACHE_HIT: ${{ steps.setup.outputs.playwright-cache-hit }}
           PW_VERSION: ${{ steps.setup.outputs.playwright-version }}
         run: |
-          if [ "$PW_VERSION" != "1.52.0" ]; then
-            echo "::error::expected playwright-version=1.52.0 from apps/web, got '$PW_VERSION' (unpinned means it read the root package.json)" >&2
+          if [ "$PW_VERSION" != "1.63.0" ]; then
+            echo "::error::expected playwright-version=1.63.0 from apps/web, got '$PW_VERSION' (unpinned means it read the root package.json)" >&2
             exit 1
           fi
           if [ -d .github/test-fixtures/bun-workspace-playwright/node_modules ]; then
@@ -1135,8 +1135,8 @@ jobs:
           PW_CACHE_HIT: ${{ steps.setup.outputs.playwright-cache-hit }}
           PW_VERSION: ${{ steps.setup.outputs.playwright-version }}
         run: |
-          if [ "$PW_VERSION" != "1.52.0" ]; then
-            echo "::error::expected playwright-version=1.52.0 from apps/web, got '$PW_VERSION'" >&2
+          if [ "$PW_VERSION" != "1.63.0" ]; then
+            echo "::error::expected playwright-version=1.63.0 from apps/web, got '$PW_VERSION'" >&2
             exit 1
           fi
           if [ "$PW_CACHE_HIT" != "true" ]; then

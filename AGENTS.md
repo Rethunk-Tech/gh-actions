@@ -162,7 +162,10 @@ to get wrong when writing that kind of test:
   varies. This file is the only thing that proves any action works; being obvious when it
   fails outranks being short.
 - **Playwright browser-cache keys are the resolved package version, not the job name.** Each
-  Playwright fixture therefore pins a *different* `@playwright/test` (1.64.1 / 1.55.1 / 1.52.0).
+  Playwright fixture therefore pins a *different* `@playwright/test` (1.64.1 / 1.65.0 / 1.63.0).
+  Each must be at least 1.61.0, the first release whose `hostPlatform` maps `ubuntu26.04` and
+  ships chromium download paths for it — an older pin fails on `ubuntu-latest` with
+  "Playwright does not support chromium on ubuntu26.04-x64".
   Sharing one version lets two cold jobs race `playwright-<os>-<version>` after the reset job
   wipes the prefix. `playwright-directory` is covered by the skip-install workspace fixture:
   the pin lives only under `apps/web`, which is the Bastion/caldera/prepaudit shape.

@@ -4,6 +4,6 @@
 	"private": true,
 	"packageManager": "bun@1.4.3",
 	"devDependencies": {
-		"@playwright/test": "1.55.1"
+		"@playwright/test": "1.65.0"
 	}
 }
