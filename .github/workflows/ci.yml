@@ -102,9 +102,13 @@ jobs:
   # very first run against a given fixture's lockfile; every later push whose fixture didn't
   # change would incorrectly restore the previous run's cache. Found via a real GitHub-hosted
   # run, not local `act` testing (which resets its cache-server-path per invocation and can't
-  # surface this). Fix: wipe both self-test cache prefixes for this ref in one serial job
-  # before either -cold job starts, so there's no window for a race between the two fixtures'
-  # deletes and saves.
+  # surface this). PRs also restore an exact key from the base/default branch, so wiping only
+  # this ref leaves main's last save sitting there: a PR that does not change a lock hash
+  # (osv-scanner.toml under *-vulnerable/ is one) gets cache-hit=true on every cold job.
+  # Main stays green because its reset already targets the only ref it restores from.
+  # Fix: wipe the self-test prefixes for this ref and for the refs GitHub would restore from,
+  # in one serial job before either -cold job starts, so there's no window for a race between
+  # the two fixtures' deletes and saves.
   reset-self-test-caches:
     name: Reset self-test caches (ensure genuinely cold)
     needs: lint
@@ -113,13 +117,26 @@ jobs:
     permissions:
       actions: write
     steps:
-      - name: Delete every self-test cache prefix for this ref
+      - name: Delete every self-test cache prefix this run can restore
         env:
           GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
           # --ref cannot be combined with a numeric cache ID (only with a key string). IDs are
           # already unambiguous, so no --ref is needed on the delete call itself.
           prefixes='Linux-bun- Linux-nextjs- setup-go-Linux- setup-go-lint- setup-rust- playwright-Linux- Linux-bun-extra- setup-uv-'
+
+          # GITHUB_REF is this run; GITHUB_BASE_REF / DEFAULT_BRANCH are the branches a PR
+          # restore still searches. refs/heads/$branch matches how gh cache list --ref stores them.
+          refs="$GITHUB_REF"
+          for branch in "$GITHUB_BASE_REF" "$DEFAULT_BRANCH"; do
+            [ -n "$branch" ] || continue
+            extra="refs/heads/$branch"
+            case " $refs " in
+              *" $extra "*) continue ;;
+            esac
+            refs="$refs $extra"
+          done
 
           # A single transient 5xx from the cache API must not abort this step: warm caches would
           # make every cold-cache assertion downstream fail for the wrong reason.
@@ -127,14 +144,18 @@ jobs:
           # fails the job, which is what keeps the cold assertions meaningful.
           for attempt in 1 2 3; do
             for prefix in $prefixes; do
-              for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id'); do
-                gh cache delete "$id" --repo "$GITHUB_REPOSITORY" || true
+              for ref in $refs; do
+                for id in $(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$ref" --key "$prefix" --json id -q '.[].id'); do
+                  gh cache delete "$id" --repo "$GITHUB_REPOSITORY" || true
+                done
               done
             done
             remaining=0
             for prefix in $prefixes; do
-              n=$(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF" --key "$prefix" --json id -q '.[].id' | wc -l)
-              remaining=$((remaining + n))
+              for ref in $refs; do
+                n=$(gh cache list --repo "$GITHUB_REPOSITORY" --ref "$ref" --key "$prefix" --json id -q '.[].id' | wc -l)
+                remaining=$((remaining + n))
+              done
             done
             [ "$remaining" -eq 0 ] && break
             echo "cache delete attempt $attempt left $remaining cache(s); retrying" >&2
