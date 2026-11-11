@@ -1,0 +1,17 @@
+# Scorecard's Vulnerabilities check runs osv-scanner; the audit gate
+# still needs these packages unfixed, so ignore only here.
+[[IgnoredVulns]]
+id = "GHSA-29mw-wpgm-hmr9"
+reason = "deliberately vulnerable test fixture"
+
+[[IgnoredVulns]]
+id = "GHSA-35jh-r3h4-6jhm"
+reason = "deliberately vulnerable test fixture"
+
+[[IgnoredVulns]]
+id = "GHSA-r5fr-rjxr-66jc"
+reason = "deliberately vulnerable test fixture"
+
+[[IgnoredVulns]]
+id = "GHSA-xxjr-mmjv-4gpg"
+reason = "deliberately vulnerable test fixture"
