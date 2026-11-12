@@ -12,9 +12,11 @@ on:
 permissions: {}
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  # Never cancel a publish mid-flight. Tag refs are unique so this should never fire anyway.
-  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+  group: ${{ github.workflow }}
+  # One group for every tag: a v1.10 job that checked out before v1.11 existed
+  # must finish (or queue behind) so it cannot force-push v1 last. Never cancel
+  # a publish mid-flight.
+  cancel-in-progress: false
 
 jobs:
   release:
