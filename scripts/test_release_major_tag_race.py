@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Fail if overlapping Release jobs can leave the floating major on an older tag.
+"""Fail if a tag's GitHub Release is dropped or the floating major lands on an older tag.
 
-The move-major step force-pushes vN when this tag looks newest in that job's
-checkout. A per-ref concurrency group lets two tag jobs run at once; the older
-job's fetch-depth-0 checkout can omit the newer tag and overwrite vN last.
+GitHub keeps one pending run per concurrency group, so putting every tag in
+`${{ github.workflow }}` drops a middle tag's Release. The move-major job
+serializes on that shared group; a per-ref group there lets two moves run at
+once, and the older job's fetch-depth-0 checkout can omit the newer tag and
+overwrite vN last.
 """
 
 from __future__ import annotations
@@ -14,13 +16,21 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "release.yml"
+SHARED_GROUP = "${{ github.workflow }}"
 
 
-def concurrency_group(text: str) -> str:
+def top_level_concurrency_group(text: str) -> str | None:
     match = re.search(r"^concurrency:\n  group: (.+)$", text, re.M)
-    if not match:
-        raise AssertionError("release.yml: missing concurrency.group")
-    return match.group(1).strip()
+    return match.group(1).strip() if match else None
+
+
+def job_concurrency_group(text: str, job: str) -> str | None:
+    match = re.search(
+        rf"^  {re.escape(job)}:\n(?:    .+\n)*    concurrency:\n(?:      #.*\n)*      group: (.+)$",
+        text,
+        re.M,
+    )
+    return match.group(1).strip() if match else None
 
 
 def newest(tags: list[str], major: str) -> str:
@@ -45,10 +55,14 @@ def move_major(visible: list[str], this_tag: str, floating: dict[str, str]) -> N
 
 class ReleaseMajorTagRace(unittest.TestCase):
     def test_overlapping_jobs_leave_vN_on_newest(self) -> None:
-        group = concurrency_group(WORKFLOW.read_text())
+        text = WORKFLOW.read_text()
+        self.assertNotEqual(top_level_concurrency_group(text), SHARED_GROUP)
+        self.assertNotEqual(job_concurrency_group(text, "release"), SHARED_GROUP)
+        group = job_concurrency_group(text, "move-major")
+        self.assertEqual(group, SHARED_GROUP)
         floating: dict[str, str] = {}
 
-        if "github.ref" in group:
+        if group is not None and "github.ref" in group:
             # Overlap: v1.10 checked out before v1.11 existed; its force-push lands last.
             move_major(["v1.10"], "v1.10", floating)
             move_major(["v1.10", "v1.11"], "v1.11", floating)

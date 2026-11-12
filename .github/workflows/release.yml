@@ -11,19 +11,15 @@ on:
 
 permissions: {}
 
-concurrency:
-  group: ${{ github.workflow }}
-  # One group for every tag: a v1.10 job that checked out before v1.11 existed
-  # must finish (or queue behind) so it cannot force-push v1 last. Never cancel
-  # a publish mid-flight.
-  cancel-in-progress: false
-
 jobs:
   release:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: write
+    concurrency:
+      group: ${{ github.workflow }}-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       # fetch-depth: 0 brings the annotated tag OBJECT, not just the commit it points at —
       # `git tag -l --format=%(contents:...)` reads the annotation, and a shallow checkout has
@@ -53,6 +49,25 @@ jobs:
             --title "$TAG — $subject" \
             --notes "${body:-$subject}" \
             --verify-tag
+
+  move-major:
+    needs: release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    concurrency:
+      # GitHub keeps only one pending run per group; dropping a superseded
+      # pending move is correct because the newest tag wins.
+      group: ${{ github.workflow }}
+      cancel-in-progress: false
+    steps:
+      # fetch-depth: 0 brings every vN.* tag, not just this push — the newest-check
+      # below reads the list, and a shallow checkout would omit tags pushed after
+      # this job queued.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       # A consumer pinning @vN expects the newest vN.M release; left alone, v1 sat on v1.9 after
       # v1.10 shipped. Tags pushed with GITHUB_TOKEN don't trigger workflows, so moving vN here
