@@ -118,13 +118,21 @@ runs:
           rustc=(rustc "+${TOOLCHAIN:-stable}")
           extra=(--toolchain "${TOOLCHAIN:-stable}")
         fi
+        # `component add` and `target add` with no --toolchain mean the rustup default. The
+        # toolchain-file branch leaves extra empty, and cargo inside working-directory uses that
+        # file's toolchain, which is not necessarily the default.
+        if [ ${#extra[@]} -eq 0 ]; then
+          gate_tc=(--toolchain "$(rustup show active-toolchain | cut -d' ' -f1)")
+        else
+          gate_tc=("${extra[@]}")
+        fi
         if [ -n "$want_components" ]; then
           IFS=, read -ra list <<< "$want_components"
-          rustup component add "${extra[@]}" "${list[@]}"
+          rustup component add "${gate_tc[@]}" "${list[@]}"
         fi
         if [ -n "$want_targets" ]; then
           IFS=, read -ra list <<< "$want_targets"
-          rustup target add "${extra[@]}" "${list[@]}"
+          rustup target add "${gate_tc[@]}" "${list[@]}"
         fi
         gate_components=()
         if [ "$RUN_CLIPPY" = "true" ]; then
@@ -134,14 +142,6 @@ runs:
           gate_components+=(rustfmt)
         fi
         if [ ${#gate_components[@]} -gt 0 ]; then
-          # `component add` with no --toolchain installs onto the rustup default. The
-          # toolchain-file branch leaves extra empty, and cargo inside working-directory
-          # uses that file's toolchain, which is not necessarily the default.
-          if [ ${#extra[@]} -eq 0 ]; then
-            gate_tc=(--toolchain "$(rustup show active-toolchain | cut -d' ' -f1)")
-          else
-            gate_tc=("${extra[@]}")
-          fi
           rustup component add "${gate_tc[@]}" "${gate_components[@]}"
         fi
         "${rustc[@]}" -V
