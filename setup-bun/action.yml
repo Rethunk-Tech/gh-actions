@@ -310,6 +310,10 @@ runs:
             exit 1
             ;;
         esac
+        # Only an exact version names one browser build: catalog:, workspace:* and other protocol
+        # specs (or a range) resolve to whatever the registry serves today, so they cache as
+        # unpinned rather than pinning bunx and the key to a string it cannot resolve.
+        printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$' || version=unpinned
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Cache Playwright browsers
