@@ -18,11 +18,21 @@ class SetupGoCacheKey(unittest.TestCase):
 
     def test_single_caller_glob_still_uses_hashfiles(self) -> None:
         self.assertIn("hashFiles(inputs.cache-dependency-path)", ACTION)
-        self.assertIn("sha256sum", ACTION)
+
+    def test_hashes_with_shasum_so_macos_gets_a_key(self) -> None:
+        self.assertNotIn("sha256sum", ACTION)
+        self.assertEqual(ACTION.count('shasum -a 256 "$f"'), 1)
+        self.assertIn("| shasum -a 256 |", ACTION)
 
     def test_suffix_is_empty_by_default_and_on_the_primary_key_only(self) -> None:
-        self.assertEqual(ACTION.count("inputs.cache-key-suffix &&"), 2)  # build and lint keys
-        key = next(l for l in ACTION.splitlines() if l.strip().startswith("key: setup-go-${{ runner.os"))
+        self.assertEqual(
+            ACTION.count("inputs.cache-key-suffix &&"), 2
+        )  # build and lint keys
+        key = next(
+            l
+            for l in ACTION.splitlines()
+            if l.strip().startswith("key: setup-go-${{ runner.os")
+        )
         self.assertIn("inputs.cache-key-suffix", key)
 
 

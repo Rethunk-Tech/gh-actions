@@ -180,9 +180,9 @@ runs:
           fi
           {
             printf '%s\n' "${files[@]}" | LC_ALL=C sort | while IFS= read -r f; do
-              sha256sum "$f"
+              shasum -a 256 "$f"
             done
-          } | sha256sum | awk '{print $1}'
+          } | shasum -a 256 | awk '{print $1}'
         }
 
         if [ -n "$CACHE_DEPENDENCY_PATH" ]; then
