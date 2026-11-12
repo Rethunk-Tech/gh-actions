@@ -63,6 +63,12 @@ jobs:
           sys.exit(1 if bad else 0)
           EOF
 
+      # test_setup_bun_steps runs the actions' "Resolve Playwright version" script, which reads
+      # package.json with bun; without bun it falls back to "unpinned" and the tests fail.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: latest
+
       # setup-nextjs-bun duplicates setup-bun's shared steps instead of composing them
       # (actions/runner#2009). Fail when those steps diverge without an exception in the script.
       - name: Check setup-bun and setup-nextjs-bun shared steps
