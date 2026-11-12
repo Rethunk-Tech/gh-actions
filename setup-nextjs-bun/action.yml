@@ -203,7 +203,11 @@ runs:
       if: inputs.install-playwright == 'true'
       shell: bash
       working-directory: ${{ inputs.playwright-directory != '' && inputs.playwright-directory || inputs.working-directory }}
+      env:
+        PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
       run: |
+        browsers=$(printf '%s' "$PLAYWRIGHT_BROWSERS" | tr -s ' ' '-')
+        echo "browsers=${browsers:-default}" >> "$GITHUB_OUTPUT"
         version=$(bun --print "const p=require('./package.json'); (p.devDependencies&&p.devDependencies['@playwright/test'])||(p.dependencies&&p.dependencies['@playwright/test'])||(p.devDependencies&&p.devDependencies.playwright)||(p.dependencies&&p.dependencies.playwright)||'unpinned'" 2>/dev/null || echo unpinned)
         case "$version" in
           *$'\n'*|*$'\r'*)
@@ -219,20 +223,33 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ steps.playwright-version.outputs.version }}
+        key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright-version.outputs.browsers }}-${{ steps.playwright-version.outputs.version }}
 
     - name: Install Playwright
-      if: inputs.install-playwright == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
+      if: inputs.install-playwright == 'true'
       shell: bash
       working-directory: ${{ inputs.playwright-directory != '' && inputs.playwright-directory || inputs.working-directory }}
       env:
         PLAYWRIGHT_BROWSERS: ${{ inputs.playwright-browsers }}
         PLAYWRIGHT_VERSION: ${{ steps.playwright-version.outputs.version }}
+        PLAYWRIGHT_CACHE_HIT: ${{ steps.playwright-cache.outputs.cache-hit }}
       run: |
         # PLAYWRIGHT_BROWSERS may hold multiple space-separated browser names; word-splitting is
         # intentional, and an empty value leaves no arguments, which installs the default set.
         # shellcheck disable=SC2086
         set -- $PLAYWRIGHT_BROWSERS
+        # A hit is keyed by the browser set, but a restored directory can still lack one of the
+        # requested browsers; install when any is absent rather than trusting the hit alone.
+        if [ "$PLAYWRIGHT_CACHE_HIT" = "true" ]; then
+          missing=0
+          for b in "$@"; do
+            ls -d "$HOME/.cache/ms-playwright/$b"-* >/dev/null 2>&1 || missing=1
+          done
+          if [ "$missing" = "0" ]; then
+            echo "Playwright browsers restored from cache"
+            exit 0
+          fi
+        fi
         # Pin the CLI to the same version the cache key used. skip-install (no node_modules)
         # would otherwise let bunx fetch whatever "playwright" resolves to today, then save
         # those browsers under the package.json pin — a later job restores a mismatched build.
