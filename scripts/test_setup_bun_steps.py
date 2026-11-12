@@ -64,5 +64,16 @@ class PlaywrightVersionPin(unittest.TestCase):
                 self.assertIn("version=1.64.1", self.resolve(action, "1.64.1"))
 
 
+class ExtraCacheKey(unittest.TestCase):
+    def test_key_separates_different_path_sets(self) -> None:
+        for action in drift.ACTIONS:
+            with self.subTest(action):
+                spec = step(action, "Cache extra paths")
+                self.assertIn("steps.extra-paths-hash.outputs.hash", spec["with.key"])
+                self.assertIn(
+                    "steps.extra-paths-hash.outputs.hash", spec["with.restore-keys"]
+                )
+
+
 if __name__ == "__main__":
     unittest.main()

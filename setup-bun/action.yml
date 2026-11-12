@@ -203,14 +203,24 @@ runs:
         echo "::error::extra-cache-paths and extra-cache-key must both be set, or both left empty" >&2
         exit 1
 
+    # Hash the path set itself: actions/cache matches on the key alone, so two callers caching
+    # different directories under one key would restore each other's contents.
+    - name: Hash extra-cache paths
+      id: extra-paths-hash
+      if: inputs.extra-cache-paths != '' && inputs.extra-cache-key != ''
+      shell: bash
+      env:
+        EXTRA_CACHE_PATHS: ${{ inputs.extra-cache-paths }}
+      run: echo "hash=$(printf '%s' "$EXTRA_CACHE_PATHS" | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
+
     - name: Cache extra paths
       if: inputs.extra-cache-paths != '' && inputs.extra-cache-key != ''
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ inputs.extra-cache-paths }}
-        key: ${{ runner.os }}-bun-extra-${{ inputs.extra-cache-key }}
+        key: ${{ runner.os }}-bun-extra-${{ steps.extra-paths-hash.outputs.hash }}-${{ inputs.extra-cache-key }}
         restore-keys: |
-          ${{ runner.os }}-bun-extra-${{ inputs.extra-cache-restore-key-fragment }}
+          ${{ runner.os }}-bun-extra-${{ steps.extra-paths-hash.outputs.hash }}-${{ inputs.extra-cache-restore-key-fragment }}
 
     - name: bun install
       if: inputs.skip-install != 'true'

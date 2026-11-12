@@ -18,6 +18,7 @@ WATCHED = (
     "Setup Bun",
     "Cache Bun install store",
     "Require extra-cache paths and key together",
+    "Hash extra-cache paths",
     "Cache extra paths",
     "Resolve Playwright version",
     "Cache Playwright browsers",
