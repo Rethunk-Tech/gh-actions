@@ -48,7 +48,79 @@ done
 exit "$bad"
 '''
 
-# CI asserts the shared actions fail on these fixtures, so they are broken on purpose and gate leaves them out.
+# Same expected-failure as test-setup-bun-test-fail: bun test must fail.
+[gates.bun-app-failing]
+run = '''
+cd .github/test-fixtures/bun-app-failing
+if bun test; then
+  echo "::error::expected bun test to fail on bun-app-failing" >&2
+  exit 1
+fi
+'''
+
+# Same expected-failure as test-setup-go-test-fail: go test ./... must fail.
+[gates.go-app-failing]
+run = '''
+cd .github/test-fixtures/go-app-failing
+if go test ./...; then
+  echo "::error::expected go test ./... to fail on go-app-failing" >&2
+  exit 1
+fi
+'''
+
+# Same expected-failure as test-setup-go-govulncheck-fail: govulncheck must report an advisory.
+[gates.go-app-vulnerable]
+run = '''
+cd .github/test-fixtures/go-app-vulnerable
+output=$(govulncheck ./... 2>&1) || true
+printf '%s\n' "$output"
+if printf '%s\n' "$output" | grep -qE 'GO-[0-9]+-[0-9]+'; then
+  exit 0
+fi
+echo "::error::expected govulncheck to report an advisory on go-app-vulnerable" >&2
+exit 1
+'''
+
+# Same expected-failure as test-setup-python-test-fail: pytest must fail.
+[gates.python-app-failing]
+run = '''
+cd .github/test-fixtures/python-app-failing
+if uv run --locked --group dev pytest; then
+  echo "::error::expected pytest to fail on python-app-failing" >&2
+  exit 1
+fi
+'''
+
+# Same expected-failure as test-setup-python-audit-fail: uv audit must report jinja2.
+[gates.python-app-vulnerable]
+run = '''
+cd .github/test-fixtures/python-app-vulnerable
+output=$(uv audit --locked 2>&1) || true
+printf '%s\n' "$output"
+if printf '%s\n' "$output" | grep -qi jinja2; then
+  exit 0
+fi
+echo "::error::expected uv audit to report an advisory on python-app-vulnerable" >&2
+exit 1
+'''
+
+# Same expected-failure as test-setup-rust-test-catches-failure: cargo test must fail.
+[gates.rust-app-failing]
+run = '''
+cd .github/test-fixtures/rust-app-failing
+if cargo test --locked --all-targets; then
+  echo "::error::expected cargo test to fail on rust-app-failing" >&2
+  exit 1
+fi
+'''
+
+# python-app-broken / python-app-unformatted stay CI-only: those jobs assert composite
+# ruff/format outcomes on a GitHub runner, not a command gate can invert locally.
+# rust-app-vulnerable stays CI-only: cargo audit is not in the local rust detect
+# chain (build/clippy/test) and is not installed here; CI asserts setup-rust
+# run-audit on a runner.
+# The failing/vulnerable fixtures gated above stay excluded so detect does not
+# also run the success-path checks on trees that fail by design.
 [detect]
 exclude = [
   "go-app-failing",
