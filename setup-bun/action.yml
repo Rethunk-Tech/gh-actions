@@ -56,17 +56,19 @@ inputs:
     default: ""
   extra-cache-key:
     description: >
-      Fragment appended to the extra-paths cache key, after `<os>-bun-extra-`. Make it
-      change whenever the cached content should be rebuilt — a commit SHA for a build
-      cache that should always save fresh, a hashFiles() for one keyed on its inputs.
+      Fragment appended to the extra-paths cache key, after `<os>-bun-extra-<paths-hash>-`,
+      where the path hash covers extra-cache-paths so two callers caching different
+      directories never share an entry. Make it change whenever the cached content should be
+      rebuilt — a commit SHA for a build cache that should always save fresh, a hashFiles()
+      for one keyed on its inputs.
     required: false
     default: ""
   extra-cache-restore-key-fragment:
     description: >
-      Fragment appended to the extra-paths restore-keys prefix, after `<os>-bun-extra-`.
-      Empty means restore from any previous extra cache for this OS, which is what a
-      SHA-keyed build cache wants — the key never repeats, so the prefix is the only
-      thing that can match.
+      Fragment appended to the extra-paths restore-keys prefix, after
+      `<os>-bun-extra-<paths-hash>-`. Empty means restore from any previous extra cache for
+      this OS with the same path set, which is what a SHA-keyed build cache wants — the key
+      never repeats, so the prefix is the only thing that can match.
     required: false
     default: ""
   playwright-directory:
