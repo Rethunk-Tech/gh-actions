@@ -103,6 +103,23 @@ and sets `NEXT_TELEMETRY_DISABLED=1`. It does not accept `setup-bun`'s `skip-ins
 `install-args`, `run-audit`, or `run-test` — undeclared `with:` keys are ignored.
 One Next.js app per call — for a repo with multiple Next apps, call this once per app instead.
 
+There is no audit or test gate here, and none is planned: `setup-bun` cannot be composed in
+because of [actions/runner#2009](https://github.com/actions/runner/issues/2009) and
+[#2030](https://github.com/actions/runner/issues/2030). Add the gates as their own steps after it
+(`audit-bun` only needs Bun on PATH):
+
+```yaml
+- uses: actions/checkout@v7
+- uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.25
+  with:
+    working-directory: frontend
+- uses: Rethunk-Tech/gh-actions/audit-bun@v1.25
+  with:
+    working-directory: frontend
+- run: bun test
+  working-directory: frontend
+```
+
 ```yaml
 - uses: actions/checkout@v7
 - uses: Rethunk-Tech/gh-actions/setup-nextjs-bun@v1.25
