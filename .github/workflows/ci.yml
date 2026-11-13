@@ -132,7 +132,7 @@ jobs:
         run: |
           # --ref cannot be combined with a numeric cache ID (only with a key string). IDs are
           # already unambiguous, so no --ref is needed on the delete call itself.
-          prefixes='Linux-bun- Linux-nextjs- setup-go-Linux- setup-go-Windows- setup-go-macOS- setup-go-lint- setup-rust- playwright-Linux- Linux-bun-extra- setup-uv-'
+          prefixes='Linux-X64-bun- Linux-X64-nextjs- setup-go-Linux- setup-go-Windows- setup-go-macOS- setup-go-lint- setup-rust- playwright-Linux-X64- setup-uv-'
 
           # GITHUB_REF is this run; GITHUB_BASE_REF / DEFAULT_BRANCH are the branches a PR
           # restore still searches. refs/heads/$branch matches how gh cache list --ref stores them.
