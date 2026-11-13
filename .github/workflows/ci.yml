@@ -729,6 +729,7 @@ jobs:
           TEST: ${{ steps.setup.outputs.test-outcome }}
           PHASE: ${{ matrix.phase }}
         working-directory: .github/test-fixtures/go-app
+        shell: bash
         run: |
           go build ./...
           if [ "$CACHE_MODE" != "build" ]; then
@@ -845,6 +846,7 @@ jobs:
           TEST: ${{ steps.setup.outputs.test-outcome }}
           PHASE: ${{ matrix.phase }}
         working-directory: .github/test-fixtures/rust-app
+        shell: bash
         run: |
           cargo clippy --locked -- -D warnings
           cargo build --locked
