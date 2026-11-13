@@ -150,9 +150,10 @@ runs:
         cargo_home=${CARGO_HOME:-$HOME/.cargo}
         target_dir=${CARGO_TARGET_DIR:-$PWD/target}
         # actions/cache is a node process: on Windows it needs C:/... paths, not Git Bash's /c/...
-        if command -v cygpath >/dev/null 2>&1; then
-          cargo_home=$(cygpath -m "$cargo_home")
-          target_dir=$(cygpath -m "$target_dir")
+        # cygpath is not on PATH in the bare `bash --noprofile` that Actions starts, so rewrite /c/... by hand.
+        if [ "$RUNNER_OS" = "Windows" ]; then
+          cargo_home=$(printf '%s' "$cargo_home" | sed -E 's#^/([A-Za-z])/#\1:/#')
+          target_dir=$(printf '%s' "$target_dir" | sed -E 's#^/([A-Za-z])/#\1:/#')
         fi
         {
           echo "SETUP_RUST_CARGO_HOME=$cargo_home"
