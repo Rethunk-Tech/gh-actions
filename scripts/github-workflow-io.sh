@@ -22,3 +22,13 @@ github_require_single_line() {
       ;;
   esac
 }
+
+# sha256sum (GNU coreutils: Linux and Git Bash on Windows) or shasum (macOS, which has no
+# sha256sum). Both print "<hex>  <file>" and accept -c, so callers pass the same arguments.
+github_sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$@"
+  else
+    shasum -a 256 "$@"
+  fi
+}

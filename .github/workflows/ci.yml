@@ -132,7 +132,7 @@ jobs:
         run: |
           # --ref cannot be combined with a numeric cache ID (only with a key string). IDs are
           # already unambiguous, so no --ref is needed on the delete call itself.
-          prefixes='Linux-bun- Linux-nextjs- setup-go-Linux- setup-go-lint- setup-rust- playwright-Linux- Linux-bun-extra- setup-uv-'
+          prefixes='Linux-bun- Linux-nextjs- setup-go-Linux- setup-go-Windows- setup-go-macOS- setup-go-lint- setup-rust- playwright-Linux- Linux-bun-extra- setup-uv-'
 
           # GITHUB_REF is this run; GITHUB_BASE_REF / DEFAULT_BRANCH are the branches a PR
           # restore still searches. refs/heads/$branch matches how gh cache list --ref stores them.
@@ -704,13 +704,14 @@ jobs:
   # share an exact key. One job id with two matrix legs does: max-parallel 1 runs them in
   # declared order, and the cold leg's post-step save lands before the warm leg starts.
   test-setup-go-cache:
-    name: setup-go self-test (${{ matrix.phase }} cache)
+    name: setup-go self-test (${{ matrix.os }} ${{ matrix.phase }} cache)
     needs: reset-self-test-caches
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       max-parallel: 1
       matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
         phase: [cold, warm]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -819,13 +820,14 @@ jobs:
   # The fixture's rust-toolchain.toml names clippy, so clippy running proves the toolchain-file
   # path installed its components.
   test-setup-rust-cache:
-    name: setup-rust self-test (${{ matrix.phase }} cache)
+    name: setup-rust self-test (${{ matrix.os }} ${{ matrix.phase }} cache)
     needs: reset-self-test-caches
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       max-parallel: 1
       matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
         phase: [cold, warm]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

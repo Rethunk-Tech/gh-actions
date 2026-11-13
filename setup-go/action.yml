@@ -180,9 +180,9 @@ runs:
           fi
           {
             printf '%s\n' "${files[@]}" | LC_ALL=C sort | while IFS= read -r f; do
-              shasum -a 256 "$f"
+              github_sha256 "$f"
             done
-          } | shasum -a 256 | awk '{print $1}'
+          } | github_sha256 | awk '{print $1}'
         }
 
         if [ -n "$CACHE_DEPENDENCY_PATH" ]; then
@@ -315,7 +315,7 @@ runs:
           echo "::error::$(github_encode "$base.tar.gz is not listed in the v$version checksums file")" >&2
           exit 1
         }
-        shasum -a 256 -c expected.txt
+        github_sha256 -c expected.txt
         tar -xzf "$base.tar.gz"
         echo "bin=$dir/$base/golangci-lint" >> "$GITHUB_OUTPUT"
 

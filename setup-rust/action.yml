@@ -243,7 +243,7 @@ runs:
         cd "$dir" || exit 1
         curl -fsSL --max-time 60 --retry 5 --retry-all-errors --retry-max-time 120 -o "$base.tgz" \
           "https://github.com/rustsec/rustsec/releases/download/cargo-audit%2Fv$version/$base.tgz"
-        echo "$sha256  $base.tgz" | shasum -a 256 -c -
+        echo "$sha256  $base.tgz" | github_sha256 -c -
         tar -xzf "$base.tgz"
         echo "bin=$dir/$base/cargo-audit" >> "$GITHUB_OUTPUT"
 

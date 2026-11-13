@@ -19,10 +19,12 @@ class SetupGoCacheKey(unittest.TestCase):
     def test_single_caller_glob_still_uses_hashfiles(self) -> None:
         self.assertIn("hashFiles(inputs.cache-dependency-path)", ACTION)
 
-    def test_hashes_with_shasum_so_macos_gets_a_key(self) -> None:
+    def test_hashes_through_the_portable_helper(self) -> None:
+        # windows-latest has no shasum and macOS has no sha256sum.
+        self.assertNotIn("shasum", ACTION)
         self.assertNotIn("sha256sum", ACTION)
-        self.assertEqual(ACTION.count('shasum -a 256 "$f"'), 1)
-        self.assertIn("| shasum -a 256 |", ACTION)
+        self.assertEqual(ACTION.count('github_sha256 "$f"'), 1)
+        self.assertIn("| github_sha256 |", ACTION)
 
     def test_suffix_is_empty_by_default_and_on_the_primary_key_only(self) -> None:
         self.assertEqual(
