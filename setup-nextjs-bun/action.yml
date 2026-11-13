@@ -65,17 +65,21 @@ inputs:
     default: ""
   extra-cache-key:
     description: >
-      Fragment appended to the extra-paths cache key, after `<os>-bun-extra-<paths-hash>-`,
+      Fragment appended to the extra-paths cache key, after `<os>-<arch>-bun-extra-<paths-hash>-`,
       where the path hash covers extra-cache-paths so two callers caching different
       directories never share an entry. Make it change whenever the cached content should be
-      rebuilt — a commit SHA for a build cache that should always save fresh, a hashFiles()
-      for one keyed on its inputs.
+      rebuilt — a hashFiles() for one keyed on its inputs. WARNING: do not key on a commit SHA
+      (or run id) unless the cache is small. Such a key never hits, so every run saves a fresh
+      entry of the full size: a 1.6 GB build cache cost 1.6 GB of upload per run and churned
+      the repo's 10 GB cache quota, evicting the entries other jobs rely on. Key on the inputs
+      that change the content, and set extra-cache-restore-key-fragment only if you accept
+      restoring a stale entry.
     required: false
     default: ""
   extra-cache-restore-key-fragment:
     description: >
       Fragment appended to the extra-paths restore-keys prefix, after
-      `<os>-bun-extra-<paths-hash>-`. Empty means restore from any previous extra cache for
+      `<os>-<arch>-bun-extra-<paths-hash>-`. Empty means restore from any previous extra cache for
       this OS with the same path set, which is what a SHA-keyed build cache wants — the key
       never repeats, so the prefix is the only thing that can match.
     required: false
@@ -152,10 +156,11 @@ runs:
     # No restore-keys: see the same step in setup-bun for the measured store growth.
     - name: Cache Bun install store
       id: bun-cache
+      if: github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.bun/install/cache
-        key: ${{ runner.os }}-bun-${{ steps.setup-bun.outputs.bun-version }}-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}
+        key: ${{ runner.os }}-${{ runner.arch }}-bun-${{ steps.setup-bun.outputs.bun-version }}-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}
 
     # The runner re-evaluates a cache step's `with:` in its post step, after bun install and the
     # caller's build. A hashFiles() source glob in the key then walks node_modules and .next:
@@ -168,12 +173,13 @@ runs:
       run: echo "NEXT_SRC_HASH=$NEXT_SRC_HASH" >> "$GITHUB_ENV"
 
     - name: Cache Next.js build cache
+      if: github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.NEXT_CACHE_DIR }}
-        key: ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-${{ env.NEXT_SRC_HASH }}
+        key: ${{ runner.os }}-${{ runner.arch }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-${{ env.NEXT_SRC_HASH }}
         restore-keys: |
-          ${{ runner.os }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-
+          ${{ runner.os }}-${{ runner.arch }}-nextjs-${{ hashFiles(format('{0}/bun.lock', inputs.working-directory)) }}-
 
     - name: Require extra-cache paths and key together
       if: (inputs.extra-cache-paths != '' && inputs.extra-cache-key == '') || (inputs.extra-cache-paths == '' && inputs.extra-cache-key != '')
@@ -193,13 +199,13 @@ runs:
       run: echo "hash=$(printf '%s' "$EXTRA_CACHE_PATHS" | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
 
     - name: Cache extra paths
-      if: inputs.extra-cache-paths != '' && inputs.extra-cache-key != ''
+      if: inputs.extra-cache-paths != '' && inputs.extra-cache-key != '' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ inputs.extra-cache-paths }}
-        key: ${{ runner.os }}-bun-extra-${{ steps.extra-paths-hash.outputs.hash }}-${{ inputs.extra-cache-key }}
+        key: ${{ runner.os }}-${{ runner.arch }}-bun-extra-${{ steps.extra-paths-hash.outputs.hash }}-${{ inputs.extra-cache-key }}
         restore-keys: |
-          ${{ runner.os }}-bun-extra-${{ steps.extra-paths-hash.outputs.hash }}-${{ inputs.extra-cache-restore-key-fragment }}
+          ${{ runner.os }}-${{ runner.arch }}-bun-extra-${{ steps.extra-paths-hash.outputs.hash }}-${{ inputs.extra-cache-restore-key-fragment }}
 
     - name: bun install
       shell: bash
@@ -235,7 +241,7 @@ runs:
 
     - name: Cache Playwright browsers
       id: playwright-cache
-      if: inputs.install-playwright == 'true'
+      if: inputs.install-playwright == 'true' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright

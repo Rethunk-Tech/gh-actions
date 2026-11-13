@@ -46,7 +46,7 @@ def pair(
     bun_pw: str = BUN_PW,
     next_pw: str = CORE,
     bun_if: str | None = drift.LOCKFILE_IF,
-    next_if: str | None = None,
+    next_if: str | None = drift.NO_UNTRUSTED_CACHE,
 ) -> dict[str, dict[str, dict[str, object]]]:
     return {
         "setup-bun": steps(bun_pw, bun_if),
@@ -104,19 +104,20 @@ class ParseSteps(unittest.TestCase):
 class CheckCacheIf(unittest.TestCase):
     def test_check_cache_if(self) -> None:
         cases: list[tuple[str, dict[str, str], dict[str, str], list[str]]] = [
-            ("reviewed exception", {"if": drift.LOCKFILE_IF}, {}, []),
+            ("reviewed exception", {"if": drift.LOCKFILE_IF}, {"if": drift.NO_UNTRUSTED_CACHE}, []),
             (
                 "next grew an if",
                 {"if": drift.LOCKFILE_IF},
                 {"if": "true"},
                 [
-                    "Cache Bun install store grew an if on setup-nextjs-bun (true); review it explicitly"
+                    "Cache Bun install store on setup-nextjs-bun must be gated on "
+                    f"{drift.NO_UNTRUSTED_CACHE!r}, got 'true'"
                 ],
             ),
             (
                 "both unset",
                 {},
-                {},
+                {"if": drift.NO_UNTRUSTED_CACHE},
                 [
                     "Cache Bun install store if matches (both unset); remove the lockfile exception"
                 ],
@@ -124,7 +125,7 @@ class CheckCacheIf(unittest.TestCase):
             (
                 "wrong bun if",
                 {"if": "true"},
-                {},
+                {"if": drift.NO_UNTRUSTED_CACHE},
                 [
                     "Cache Bun install store if on setup-bun must stay "
                     f"{drift.LOCKFILE_IF!r}, got 'true'"

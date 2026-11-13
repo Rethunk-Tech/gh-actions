@@ -227,7 +227,7 @@ runs:
     # what that fallback carries forward.
     - name: Cache Go modules and build cache
       id: go-cache
-      if: inputs.cache != 'false' && inputs.cache-build != 'false'
+      if: inputs.cache != 'false' && inputs.cache-build != 'false' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
@@ -240,7 +240,7 @@ runs:
 
     - name: Cache Go modules
       id: go-mod-cache
-      if: inputs.cache != 'false' && inputs.cache-build == 'false'
+      if: inputs.cache != 'false' && inputs.cache-build == 'false' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.SETUP_GO_MOD_CACHE }}
@@ -266,7 +266,7 @@ runs:
     # inside this action, so restore and save are split and an exact hit skips the save.
     - name: Restore golangci-lint cache
       id: lint-cache
-      if: inputs.run-lint == 'true' || inputs.run-fmt == 'true'
+      if: (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/setup-go-golangci-lint
@@ -380,7 +380,7 @@ runs:
         "$GOLANGCI_LINT" fmt --diff
 
     - name: Save golangci-lint cache
-      if: (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && steps.lint-cache.outputs.cache-hit != 'true'
+      if: (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && steps.lint-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/setup-go-golangci-lint

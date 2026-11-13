@@ -166,6 +166,7 @@ runs:
     # dependency's remote URL there, and a URL with an embedded token would be uploaded.
     - name: Cache cargo registry and target
       id: cargo-cache
+      if: github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |

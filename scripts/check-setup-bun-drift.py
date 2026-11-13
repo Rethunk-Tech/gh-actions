@@ -25,7 +25,10 @@ WATCHED = (
     "Install Playwright",
     "Install Playwright system deps",
 )
-LOCKFILE_IF = "steps.lockfile.outputs.present == 'true'"
+NO_UNTRUSTED_CACHE = (
+    "github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'"
+)
+LOCKFILE_IF = f"steps.lockfile.outputs.present == 'true' && {NO_UNTRUSTED_CACHE}"
 PACKAGE_JSON_GUARD = (
     "if [ -f package.json ]; then",
     "else",
@@ -180,9 +183,9 @@ def check_cache_if(
 ) -> None:
     bun = left.get("if")
     nxt = right.get("if")
-    if nxt is not None:
+    if nxt != NO_UNTRUSTED_CACHE:
         errors.append(
-            f"Cache Bun install store grew an if on setup-nextjs-bun ({nxt}); review it explicitly"
+            f"Cache Bun install store on setup-nextjs-bun must be gated on {NO_UNTRUSTED_CACHE!r}, got {nxt!r}"
         )
         return
     if bun == LOCKFILE_IF:

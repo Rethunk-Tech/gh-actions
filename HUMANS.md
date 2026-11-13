@@ -47,14 +47,16 @@ lockfile, such as a Turborepo `.turbo`. `extra-cache-paths` and `extra-cache-key
 required for the cache to run at all; setting exactly one fails the job with an
 error that names both (`extra-cache-restore-key-fragment` is optional). Paths
 use `actions/cache` `path` form (newline-separated for more than one). Leaving the restore
-fragment empty restores from any previous extra cache for this OS, which is what a SHA-keyed
-cache wants because its key never repeats:
+fragment empty restores from any previous extra cache for this OS and architecture. Prefer a
+key built from the content's inputs. A commit-SHA key never repeats, so every run uploads a
+fresh full-size entry: caldera saved 1.6 GB per run that way and flushed the repo's 10 GB cache
+quota. Use a SHA key only for a small cache:
 
 ```yaml
 - uses: Rethunk-Tech/gh-actions/setup-bun@v1.25
   with:
     extra-cache-paths: .turbo
-    extra-cache-key: ${{ github.sha }}
+    extra-cache-key: ${{ hashFiles('bun.lock', 'turbo.json') }}
     # extra-cache-restore-key-fragment: ""   # default: match any earlier extra cache
 ```
 
