@@ -68,19 +68,44 @@ test("a malformed advisory is rejected", () => {
 	}
 });
 
+test("latestVersion uses the highest published version when the latest dist-tag is behind", async () => {
+	const orig = globalThis.fetch;
+	globalThis.fetch = (async (input) => {
+		const url = String(input);
+		if (url.endsWith("/latest")) {
+			return new Response(JSON.stringify({ version: "1.0.0" }));
+		}
+		return new Response(
+			JSON.stringify({
+				"dist-tags": { latest: "1.0.0" },
+				versions: {
+					"1.0.0": {},
+					"1.2.0": {},
+					"2.0.0-beta.1": {},
+				},
+			}),
+		);
+	}) as typeof fetch;
+	try {
+		expect(await latestVersion("lodash")).toBe("1.2.0");
+	} finally {
+		globalThis.fetch = orig;
+	}
+});
+
 test("registry URLs encode every slash so a name cannot walk the path", async () => {
 	const orig = globalThis.fetch;
 	const urls: string[] = [];
 	globalThis.fetch = (async (input) => {
 		urls.push(String(input));
-		return new Response(JSON.stringify({ version: "1.0.0" }));
+		return new Response(JSON.stringify({ versions: { "1.0.0": {} } }));
 	}) as typeof fetch;
 	try {
 		await latestVersion("foo/bar/baz");
 		await latestVersion("@scope/name");
 		expect(urls).toEqual([
-			"https://registry.npmjs.org/foo%2Fbar%2Fbaz/latest",
-			"https://registry.npmjs.org/@scope%2Fname/latest",
+			"https://registry.npmjs.org/foo%2Fbar%2Fbaz",
+			"https://registry.npmjs.org/@scope%2Fname",
 		]);
 	} finally {
 		globalThis.fetch = orig;
@@ -92,7 +117,7 @@ test("registry fetch passes an abort signal", async () => {
 	let sawSignal = false;
 	globalThis.fetch = (async (_input, init) => {
 		sawSignal = init?.signal != null;
-		return new Response(JSON.stringify({ version: "1.0.0" }));
+		return new Response(JSON.stringify({ versions: { "1.0.0": {} } }));
 	}) as typeof fetch;
 	try {
 		expect(await latestVersion("lodash")).toBe("1.0.0");
@@ -135,7 +160,9 @@ test("ignore lines need a GHSA id and a reason; comments and blanks are skipped"
 	const ignores = parseIgnores(
 		"# upstream pins zod 3\nGHSA-mrhx-c7xc-m3w5 @expo/cli requires zod ^3\n\n",
 	);
-	expect([...ignores]).toEqual([["GHSA-mrhx-c7xc-m3w5", "@expo/cli requires zod ^3"]]);
+	expect([...ignores]).toEqual([
+		["GHSA-mrhx-c7xc-m3w5", "@expo/cli requires zod ^3"],
+	]);
 	expect(() => parseIgnores("GHSA-mrhx-c7xc-m3w5")).toThrow(TypeError);
 	expect(() => parseIgnores("CVE-2026-1 reason")).toThrow(TypeError);
 });
@@ -143,6 +170,9 @@ test("ignore lines need a GHSA id and a reason; comments and blanks are skipped"
 test("the GHSA id comes from the advisory url", () => {
 	expect(ghsaOf(advisory("<1"))).toBeUndefined();
 	expect(
-		ghsaOf({ ...advisory("<1"), url: "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5" }),
+		ghsaOf({
+			...advisory("<1"),
+			url: "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
+		}),
 	).toBe("GHSA-mrhx-c7xc-m3w5");
 });

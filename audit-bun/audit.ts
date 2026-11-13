@@ -64,7 +64,10 @@ export function parseIgnores(text: string): Map<string, string> {
 			continue;
 		}
 		const [id = "", ...words] = line.split(/\s+/);
-		if (!/^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/.test(id) || words.length === 0) {
+		if (
+			!/^GHSA(-[23456789cfghjmpqrvwx]{4}){3}$/.test(id) ||
+			words.length === 0
+		) {
 			throw new TypeError(
 				`.bun-audit-ignore: ${JSON.stringify(raw)} is not "GHSA-id reason"`,
 			);
@@ -84,16 +87,40 @@ export const annotation = (
 ): string =>
 	`::${level}::${message.replaceAll("%", "%25").replaceAll("\r", "%0D").replaceAll("\n", "%0A")}`;
 
+/** Highest non-prerelease version on the registry, not the `latest` dist-tag — that tag can be moved onto an older release. */
 export async function latestVersion(pkg: string): Promise<string | undefined> {
 	try {
 		const res = await fetch(
-			`https://registry.npmjs.org/${pkg.replaceAll("/", "%2F")}/latest`,
+			`https://registry.npmjs.org/${pkg.replaceAll("/", "%2F")}`,
 			{ signal: AbortSignal.timeout(10_000) },
 		);
 		if (!res.ok) {
 			return undefined;
 		}
-		return ((await res.json()) as { version?: string }).version;
+		const body: unknown = await res.json();
+		if (
+			body === null ||
+			typeof body !== "object" ||
+			!("versions" in body) ||
+			body.versions === null ||
+			typeof body.versions !== "object"
+		) {
+			return undefined;
+		}
+		let best: string | undefined;
+		for (const v of Object.keys(body.versions)) {
+			if (v.includes("-")) {
+				continue;
+			}
+			try {
+				if (best === undefined || Bun.semver.order(v, best) > 0) {
+					best = v;
+				}
+			} catch {
+				// Registry packuments sometimes list keys that are not semver.
+			}
+		}
+		return best;
 	} catch {
 		return undefined;
 	}
@@ -144,7 +171,10 @@ async function main(): Promise<number> {
 		}
 		seen.add(id);
 		console.log(
-			annotation("warning", `${f.pkg}: ${id} ignored by .bun-audit-ignore: ${reason}`),
+			annotation(
+				"warning",
+				`${f.pkg}: ${id} ignored by .bun-audit-ignore: ${reason}`,
+			),
 		);
 		return false;
 	});
@@ -158,7 +188,10 @@ async function main(): Promise<number> {
 	for (const id of ignores.keys()) {
 		if (!seen.has(id)) {
 			console.log(
-				annotation("warning", `.bun-audit-ignore: ${id} matches no advisory; remove it`),
+				annotation(
+					"warning",
+					`.bun-audit-ignore: ${id} matches no advisory; remove it`,
+				),
 			);
 		}
 	}
