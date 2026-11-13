@@ -87,6 +87,13 @@ jobs:
             echo "$TAG is not the newest $major release ($newest); leaving $major where it is."
             exit 0
           fi
+          # Callers pin @vN, so the floating tag may only land on a commit that is on main;
+          # a vN.M tag pushed from a branch or fork-sourced commit must not become what every
+          # fleet repo runs.
+          if ! git merge-base --is-ancestor "$TAG^{commit}" origin/main; then
+            echo "::error::$TAG is not reachable from origin/main; refusing to move $major" >&2
+            exit 1
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
           git tag -fa "$major" -m "$major -> $TAG" "$TAG^{commit}"
