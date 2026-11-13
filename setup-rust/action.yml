@@ -147,9 +147,16 @@ runs:
         "${rustc[@]}" -V
         fingerprint=$(printf '%s\n%s\n' "$("${rustc[@]}" -vV)" "$want_targets" | git hash-object --stdin)
         echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+        cargo_home=${CARGO_HOME:-$HOME/.cargo}
+        target_dir=${CARGO_TARGET_DIR:-$PWD/target}
+        # actions/cache is a node process: on Windows it needs C:/... paths, not Git Bash's /c/...
+        if command -v cygpath >/dev/null 2>&1; then
+          cargo_home=$(cygpath -m "$cargo_home")
+          target_dir=$(cygpath -m "$target_dir")
+        fi
         {
-          echo "SETUP_RUST_CARGO_HOME=${CARGO_HOME:-$HOME/.cargo}"
-          echo "SETUP_RUST_TARGET_DIR=${CARGO_TARGET_DIR:-$PWD/target}"
+          echo "SETUP_RUST_CARGO_HOME=$cargo_home"
+          echo "SETUP_RUST_TARGET_DIR=$target_dir"
           # Incremental artifacts are large and never reused by a clean CI build; caching them
           # only slows the save. A caller that set it explicitly keeps its own value.
           if [ -z "${CARGO_INCREMENTAL:-}" ]; then
