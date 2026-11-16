@@ -2,10 +2,47 @@
 
 from __future__ import annotations
 
+import os
+import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
 ACTION = Path("setup-go/action.yml").read_text()
+HELPER = Path("scripts/github-workflow-io.sh").resolve()
+
+
+def _hash_listed_source() -> str:
+    start = ACTION.index("hash_listed() {")
+    end = ACTION.index("\n        }\n", start)
+    return textwrap.dedent(ACTION[start : end + len("\n        }")])
+
+
+def _run_hash_listed(tree: Path, listed: str) -> str:
+    script = (
+        f'. "{HELPER}"\n'
+        f"{_hash_listed_source()}\n"
+        'printf "%s\\n" "$LISTED" | hash_listed\n'
+    )
+    env = os.environ.copy()
+    env["LISTED"] = listed
+    result = subprocess.run(
+        ["bash", "-c", script],
+        cwd=tree,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def _module_tree(root: Path) -> None:
+    for name in ("backend", "tools"):
+        (root / name).mkdir()
+        (root / name / "go.mod").write_text(f"module {name}\n")
+        (root / name / "go.sum").write_text(f"{name} 1\n")
 
 
 class SetupGoCacheKey(unittest.TestCase):
@@ -36,6 +73,29 @@ class SetupGoCacheKey(unittest.TestCase):
             if l.strip().startswith("key: setup-go-${{ runner.os")
         )
         self.assertIn("inputs.cache-key-suffix", key)
+
+    def test_multiline_globs_hash_nested_modules(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            tree = Path(raw)
+            _module_tree(tree)
+            globs = "**/go.sum\n**/go.mod"
+            first = _run_hash_listed(tree, globs)
+            self.assertNotEqual(first, "no-modules")
+            self.assertRegex(first, r"^[0-9a-f]{64}$")
+
+            (tree / "backend" / "go.sum").write_text("backend 2\n")
+            second = _run_hash_listed(tree, globs)
+            self.assertNotEqual(second, first)
+
+            literals = "\n".join(
+                f"{name}/{fname}"
+                for name in ("backend", "tools")
+                for fname in ("go.mod", "go.sum")
+            )
+            self.assertEqual(second, _run_hash_listed(tree, literals))
+            self.assertRegex(
+                _run_hash_listed(tree, "backend/go.sum"), r"^[0-9a-f]{64}$"
+            )
 
 
 class SetupGoBuildCachePrune(unittest.TestCase):

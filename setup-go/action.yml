@@ -166,11 +166,20 @@ runs:
       run: |
         . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
         hash_listed() {
-          local files=() p
+          local files=() p f
+          # globstar so **/go.sum matches nested modules; bash 3.2 (macOS /bin/bash)
+          # has no globstar and treats ** as *, one directory deep. nullglob so a
+          # miss stays empty instead of hashing the literal pattern as a filename.
+          shopt -s globstar 2>/dev/null || true
+          shopt -s nullglob
           while IFS= read -r p || [ -n "$p" ]; do
             [ -z "$p" ] && continue
-            [ -f "$p" ] || continue
-            files+=("$p")
+            # p may be a glob; pathname expansion is intentional.
+            # shellcheck disable=SC2086
+            for f in $p; do
+              [ -f "$f" ] || continue
+              files+=("$f")
+            done
           done
           # A caller that only installs Go tools (go install x@v) has no module; key its cache
           # on the toolchain alone rather than failing the job.
