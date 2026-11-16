@@ -58,6 +58,32 @@ class PlaywrightVersionPin(unittest.TestCase):
             with self.subTest(action):
                 self.assertIn("version=unpinned", self.resolve(action, "catalog:"))
 
+    def test_range_resolves_to_installed_version(self) -> None:
+        for action in drift.ACTIONS:
+            with self.subTest(action):
+                script = step(action, "Resolve Playwright version")["run"]
+                with tempfile.TemporaryDirectory() as tmp:
+                    tmp_path = Path(tmp)
+                    (tmp_path / "package.json").write_text(
+                        json.dumps({"devDependencies": {"@playwright/test": "^1.60.0"}})
+                    )
+                    pkg = tmp_path / "node_modules" / "@playwright" / "test"
+                    pkg.mkdir(parents=True)
+                    (pkg / "package.json").write_text(
+                        json.dumps({"name": "@playwright/test", "version": "1.65.1"})
+                    )
+                    output = tmp_path / "output"
+                    output.write_text("")
+                    subprocess.run(
+                        ["bash", "-e", "-c", script],
+                        cwd=tmp_path,
+                        env={**os.environ, "GITHUB_OUTPUT": str(output)},
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertIn("version=1.65.1", output.read_text().splitlines())
+
     def test_exact_version_stays_pinned(self) -> None:
         for action in drift.ACTIONS:
             with self.subTest(action):

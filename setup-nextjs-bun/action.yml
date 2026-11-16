@@ -236,7 +236,11 @@ runs:
         # Only an exact version names one browser build: catalog:, workspace:* and other protocol
         # specs (or a range) resolve to whatever the registry serves today, so they cache as
         # unpinned rather than pinning bunx and the key to a string it cannot resolve.
-        printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$' || version=unpinned
+        exact='^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'
+        # A range or protocol spec names no build, and an "unpinned" key would restore a stale
+        # browser cache after a Playwright bump; bun install has run, so read the installed version.
+        printf '%s' "$version" | grep -Eq "$exact" || version=$(bun --no-install --print "try{require('@playwright/test/package.json').version}catch{require('playwright/package.json').version}" 2>/dev/null || echo unpinned)
+        printf '%s' "$version" | grep -Eq "$exact" || version=unpinned
         echo "version=$version" >> "$GITHUB_OUTPUT"
 
     - name: Cache Playwright browsers
