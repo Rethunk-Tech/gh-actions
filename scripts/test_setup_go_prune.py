@@ -16,18 +16,39 @@ class PruneBuildCache(unittest.TestCase):
     def test_keeps_the_newest_two_hours(self) -> None:
         with tempfile.TemporaryDirectory(prefix="go build ") as root:
             now = int(time.time())
-            ages = {"ab/new-d": 0, "ab/hour-d": 3600, "cd/edge-d": 7100, "cd/old-d": 7300, "ef/week-d": 604800}
+            ages = {
+                "ab/new-d": 0,
+                "ab/hour-d": 3600,
+                "cd/edge-d": 7100,
+                "cd/old-d": 7300,
+                "ef/week-d": 604800,
+            }
             for name, age in ages.items():
                 path = Path(root, name)
                 path.parent.mkdir(exist_ok=True)
                 path.write_text("x")
                 os.utime(path, (now - age, now - age))
             subprocess.run(["bash", str(SCRIPT), root], check=True, capture_output=True)
-            left = sorted(str(p.relative_to(root)) for p in Path(root).rglob("*") if p.is_file())
+            left = sorted(
+                str(p.relative_to(root)) for p in Path(root).rglob("*") if p.is_file()
+            )
             self.assertEqual(left, ["ab/hour-d", "ab/new-d", "cd/edge-d"])
 
     def test_a_missing_cache_is_not_an_error(self) -> None:
         subprocess.run(["bash", str(SCRIPT), "/nonexistent/go-build"], check=True)
+
+    def test_prune_runs_in_post_before_cache_save(self) -> None:
+        action = Path("setup-go/action.yml").read_text()
+        cache_at = action.index("- name: Cache Go modules and build cache")
+        prune_at = action.index(
+            "- name: Prune build cache to the saving job's working set"
+        )
+        self.assertGreater(prune_at, cache_at)
+        nxt = action.find("\n    - name:", prune_at + 1)
+        block = action[prune_at:nxt]
+        self.assertIn("uses:", block)
+        self.assertNotIn("\n      run:", block)
+        self.assertNotIn('bash "$GITHUB_ACTION_PATH/prune-build-cache.sh"', action)
 
 
 if __name__ == "__main__":

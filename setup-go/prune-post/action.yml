@@ -1,0 +1,8 @@
+name: Prune Go build cache
+description: >
+  No-op in main; prunes the Go build cache in post, after the caller compiled
+  and before the earlier actions/cache step saves (post runs in reverse).
+runs:
+  using: node20
+  main: main.js
+  post: post.js

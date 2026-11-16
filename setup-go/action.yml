@@ -232,7 +232,7 @@ runs:
     # caches. The job id sits last in the key so that each job keeps its own build profile
     # (claude-format-hooks: lint saved first and every later -race test job restored a cache
     # with no race builds, 34-38s warm). A job's first run, or a dependency change, falls back
-    # to the newest cache of any job for the same Go version, and the prune step below bounds
+    # to the newest cache of any job for the same Go version, and the prune post step bounds
     # what that fallback carries forward.
     - name: Cache Go modules and build cache
       id: go-cache
@@ -264,11 +264,15 @@ runs:
     # saving job used all sit within two hours of the newest one (an hour of job time plus that
     # bump); keep those and drop the rest. A job over two hours long can lose some of its own
     # entries, which costs a rebuild of them, not correctness.
+    # Runs in post, after the caller compiled: a main-step prune sees only restored mtimes,
+    # so the old generation stays "recent" and is saved back. Listed after actions/cache so
+    # post order is prune then save. $/ is this repo at the running commit (not the caller).
     - name: Prune build cache to the saving job's working set
       if: inputs.cache != 'false' && inputs.cache-build != 'false'
-      shell: bash
-      run: |
-        bash "$GITHUB_ACTION_PATH/prune-build-cache.sh" "$SETUP_GO_BUILD_CACHE"
+      uses: $/setup-go/prune-post
+      env:
+        SETUP_GO_BUILD_CACHE: ${{ env.SETUP_GO_BUILD_CACHE }}
+
 
     # The golangci-lint binary is downloaded rather than cached: the release fetch measured
     # 0.6s (bastion-mfa), no faster than a cache round trip. Its own analysis cache is filled
