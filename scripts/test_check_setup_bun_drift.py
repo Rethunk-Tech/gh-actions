@@ -104,7 +104,12 @@ class ParseSteps(unittest.TestCase):
 class CheckCacheIf(unittest.TestCase):
     def test_check_cache_if(self) -> None:
         cases: list[tuple[str, dict[str, str], dict[str, str], list[str]]] = [
-            ("reviewed exception", {"if": drift.LOCKFILE_IF}, {"if": drift.NO_UNTRUSTED_CACHE}, []),
+            (
+                "reviewed exception",
+                {"if": drift.LOCKFILE_IF},
+                {"if": drift.NO_UNTRUSTED_CACHE},
+                [],
+            ),
             (
                 "next grew an if",
                 {"if": drift.LOCKFILE_IF},
@@ -150,6 +155,12 @@ class CheckPlaywrightRun(unittest.TestCase):
                 "if [ -f package.json ]; then\n" + CORE,
                 CORE,
                 False,
+            ),
+            (
+                "core if/fi is not the package.json guard",
+                BUN_PW + "\nif true; then\n" + CORE + "\nfi",
+                CORE + "\nif true; then\n" + CORE + "\nfi",
+                True,
             ),
         ]
         for label, bun_run, next_run, ok in cases:

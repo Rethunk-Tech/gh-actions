@@ -32,7 +32,7 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 
 Outputs: `cache-hit` — whether the Bun install-store cache was hit. `playwright-cache-hit`
 and `playwright-version` are set when `install-playwright` is on (`playwright-version` is
-`unpinned` if no package.json at `playwright-directory` names a pin). `audit-outcome` is
+the bun.lock pin or a range's base version; `unpinned` only if nothing names a version). `audit-outcome` is
 `success`, `failure`, or `skipped` when `run-audit` is off. `test-outcome` is `success`,
 `failure`, or `skipped` when `run-test` is off.
 
@@ -40,7 +40,8 @@ and `playwright-version` are set when `install-playwright` is on (`playwright-ve
 fonts, which on `ubuntu-latest` is always the case for Chromium. A repo that asserts pixel
 snapshots of CJK or Thai text in CI should install those fonts itself. Combined with
 `skip-install`, browsers still install: the CLI is `bunx playwright@<pin>` from
-`playwright-directory`'s package.json, not an unpinned `bunx playwright`.
+`playwright-directory`'s package.json, bun.lock, or the range's base version, not an
+unpinned `bunx playwright`.
 
 **Caching a build directory too** — a path the repo owns that should not be keyed on the
 lockfile, such as a Turborepo `.turbo`. `extra-cache-paths` and `extra-cache-key` are both

@@ -207,9 +207,21 @@ def check_playwright_run(
     next_lines = norm_run(right.get("run", ""))
 
     def split(lines: list[str]) -> tuple[list[str], list[str]]:
-        guard = [line for line in lines if line in PACKAGE_JSON_GUARD]
-        core = [line for line in lines if line not in PACKAGE_JSON_GUARD]
-        return core, guard
+        # The reviewed exception is one contiguous wrapper, not every `fi`/`else`.
+        for start, line in enumerate(lines):
+            if line != "if [ -f package.json ]; then":
+                continue
+            for i in range(start + 1, len(lines) - 2):
+                if (
+                    lines[i] == "else"
+                    and lines[i + 1] == "version=unpinned"
+                    and lines[i + 2] == "fi"
+                ):
+                    core = lines[:start] + lines[start + 1 : i] + lines[i + 3 :]
+                    return core, list(PACKAGE_JSON_GUARD)
+            guard = [ln for ln in lines if ln in PACKAGE_JSON_GUARD]
+            return [ln for ln in lines if ln not in PACKAGE_JSON_GUARD], guard
+        return lines, []
 
     bun_core, bun_guard = split(bun_lines)
     next_core, next_guard = split(next_lines)

@@ -29,8 +29,8 @@ inputs:
       version bump invalidates the cache outright rather than partially restoring a stale
       browser build, matching Playwright's own documented CI caching guide. Runs regardless of
       skip-install: bunx fetches Playwright standalone, no node_modules required. The CLI is
-      pinned with bunx playwright@<version> when that package.json names a pin; otherwise the
-      cache key is "unpinned" (still caches, not invalidated by a version bump).
+      pinned with bunx playwright@<version> from package.json, bun.lock, or a range's base
+      version; "unpinned" only when nothing names a version.
     required: false
     default: "false"
   playwright-browsers:
@@ -119,8 +119,8 @@ outputs:
   playwright-version:
     description: >
       @playwright/test (or playwright) version hashed into the browser cache key. Empty when
-      install-playwright is off. "unpinned" when no package.json exists at playwright-directory
-      (or working-directory) to read a pin from — the cache still runs, it just does not
+      install-playwright is off. A range uses bun.lock's pin, then the range's base version.
+      "unpinned" only when nothing names a version — the cache still runs, it just does not
       invalidate on a version bump.
     value: ${{ steps.playwright-version.outputs.version }}
   audit-outcome:
@@ -302,9 +302,8 @@ runs:
     # Version-keyed rather than lockfile-keyed on purpose: Playwright's own CI caching guide
     # keys on the @playwright/test devDependency version specifically, because a browser build
     # must match the exact npm package version — a partial restore-keys match would silently
-    # reuse a browser build that doesn't match a newer package. Falls back to "unpinned" (no
-    # cache invalidation on a version bump, but still caches) when no package.json exists at
-    # all, e.g. skip-install with no project of its own.
+    # reuse a browser build that doesn't match a newer package. "unpinned" only when nothing
+    # names a version (no package.json pin, lockfile entry, or range base).
     - name: Resolve Playwright version
       id: playwright-version
       if: inputs.install-playwright == 'true'
@@ -326,13 +325,33 @@ runs:
             exit 1
             ;;
         esac
-        # Only an exact version names one browser build: catalog:, workspace:* and other protocol
-        # specs (or a range) resolve to whatever the registry serves today, so they cache as
-        # unpinned rather than pinning bunx and the key to a string it cannot resolve.
+        # Only an exact version names one browser build. skip-install has no node_modules, so a
+        # range reads bun.lock's pin, then the range's base version — never "unpinned", which
+        # would restore a stale browser cache after a Playwright bump.
         exact='^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'
-        # A range or protocol spec names no build, and an "unpinned" key would restore a stale
-        # browser cache after a Playwright bump; bun install has run, so read the installed version.
-        printf '%s' "$version" | grep -Eq "$exact" || version=$(bun --no-install --print "try{require('@playwright/test/package.json').version}catch{require('playwright/package.json').version}" 2>/dev/null || echo unpinned)
+        if ! printf '%s' "$version" | grep -Eq "$exact"; then
+          installed=$(bun --no-install --print "try{require('@playwright/test/package.json').version}catch{try{require('playwright/package.json').version}catch{''}}" 2>/dev/null || true)
+          if printf '%s' "$installed" | grep -Eq "$exact"; then
+            version=$installed
+          fi
+        fi
+        if ! printf '%s' "$version" | grep -Eq "$exact" && [ -f bun.lock ]; then
+          locked=$(grep -oE '@playwright/test@[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' bun.lock | head -n1 || true)
+          locked=${locked#@playwright/test@}
+          if ! printf '%s' "$locked" | grep -Eq "$exact"; then
+            locked=$(grep -oE 'playwright@[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' bun.lock | head -n1 || true)
+            locked=${locked#playwright@}
+          fi
+          if printf '%s' "$locked" | grep -Eq "$exact"; then
+            version=$locked
+          fi
+        fi
+        if ! printf '%s' "$version" | grep -Eq "$exact"; then
+          base=$(printf '%s' "$version" | grep -Eo '[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?' | head -n1 || true)
+          if printf '%s' "$base" | grep -Eq "$exact"; then
+            version=$base
+          fi
+        fi
         printf '%s' "$version" | grep -Eq "$exact" || version=unpinned
         echo "version=$version" >> "$GITHUB_OUTPUT"
 

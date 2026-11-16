@@ -89,6 +89,37 @@ class PlaywrightVersionPin(unittest.TestCase):
             with self.subTest(action):
                 self.assertIn("version=1.64.1", self.resolve(action, "1.64.1"))
 
+    def test_range_without_modules_uses_lockfile_version(self) -> None:
+        for action in drift.ACTIONS:
+            with self.subTest(action):
+                script = step(action, "Resolve Playwright version")["run"]
+                with tempfile.TemporaryDirectory() as tmp:
+                    tmp_path = Path(tmp)
+                    (tmp_path / "package.json").write_text(
+                        json.dumps({"devDependencies": {"@playwright/test": "^1.60.0"}})
+                    )
+                    (tmp_path / "bun.lock").write_text(
+                        '{"lockfileVersion":1,"packages":{"@playwright/test":["@playwright/test@1.64.1","",{},"sha"]}}\n'
+                    )
+                    output = tmp_path / "output"
+                    output.write_text("")
+                    subprocess.run(
+                        ["bash", "-e", "-c", script],
+                        cwd=tmp_path,
+                        env={**os.environ, "GITHUB_OUTPUT": str(output)},
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertIn("version=1.64.1", output.read_text().splitlines())
+
+    def test_range_without_modules_or_lockfile_uses_range_base(self) -> None:
+        for action in drift.ACTIONS:
+            with self.subTest(action):
+                lines = self.resolve(action, "^1.60.0")
+                self.assertIn("version=1.60.0", lines)
+                self.assertNotIn("version=unpinned", lines)
+
 
 class PlaywrightCacheHitEmptyDir(unittest.TestCase):
     def probe(self, action: str, browsers: str) -> str:
