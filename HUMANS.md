@@ -357,8 +357,9 @@ The key is the compiler build (`rustc -vV`) + `targets` + `Cargo.lock` hash + jo
 legs that differ by target, and jobs on different toolchains, never share a `target/`. Sets
 `CARGO_INCREMENTAL=0` unless the job already set it.
 
-A `toolchain` input becomes the rustup default, but a `rust-toolchain.toml` still wins inside
-its own directory. To check an older toolchain in such a repo, name it on the command:
+A `toolchain` input is used only when working-directory has no `rust-toolchain.toml` (or
+`rust-toolchain`); a toolchain file wins, as rustup does, and the cache fingerprint is that
+file's `rustc -vV`. To check an older toolchain in such a repo, name it on the command:
 `cargo +1.98 check`.
 
 ### `audit-bun`

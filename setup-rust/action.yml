@@ -8,11 +8,11 @@ description: >
 inputs:
   toolchain:
     description: >
-      Toolchain to install and make the rustup default (e.g. "stable", "1.98"). Leave empty to
-      install whatever working-directory's rust-toolchain.toml (or rust-toolchain) names,
-      falling back to stable when there is none. A toolchain file still outranks the rustup
-      default inside its directory, so a job checking an older toolchain against a repo that
-      pins stable runs `cargo +<toolchain> ...`.
+      Toolchain to install and make the rustup default (e.g. "stable", "1.98") when
+      working-directory has no rust-toolchain.toml (or rust-toolchain). A toolchain file
+      wins, as rustup does: the input is ignored and the cache fingerprint is the `rustc`
+      cargo runs there. Leave empty without a file to install stable. To check an older
+      toolchain against a file-pinned repo, run `cargo +<toolchain> ...`.
     required: false
     default: ""
   components:
@@ -88,8 +88,9 @@ runs:
           exit 1
         fi
 
-    # The fingerprint is `rustc -vV` plus the target list: target/ is useless to any other
-    # compiler build, and matrix legs that differ only by target share one github.job.
+    # The fingerprint is the `rustc -vV` cargo runs here plus the target list: target/ is
+    # useless to any other compiler build, and matrix legs that differ only by target share
+    # one github.job. A rust-toolchain.toml wins over the toolchain input, as rustup does.
     - name: Install Rust toolchain
       id: toolchain
       shell: bash
@@ -105,7 +106,7 @@ runs:
         want_targets=$(printf '%s' "$TARGETS" | tr ' ' ',' | tr -s ',' | sed 's/^,//;s/,$//')
         # rustup's default profile also downloads rust-docs, which no CI job reads.
         rustup set profile minimal
-        if [ -z "$TOOLCHAIN" ] && { [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; }; then
+        if [ -f rust-toolchain.toml ] || [ -f rust-toolchain ]; then
           # With no name, rustup installs the toolchain file's channel, components and targets, but keeps an
           # existing install as it is: a runner image's preinstalled stable would set the rustc and the cache key.
           rustup toolchain install --no-self-update

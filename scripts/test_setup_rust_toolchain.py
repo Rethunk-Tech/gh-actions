@@ -28,8 +28,10 @@ esac
 """
 
 RUSTC = """#!/bin/sh
+echo "rustc $*" >> "$RUSTC_LOG"
 case "$1" in
   -vV) echo 'host: x86_64-unknown-linux-gnu' ;;
+  --version|-V) echo 'rustc 1.90.0 (stub)' ;;
 esac
 """
 
@@ -51,10 +53,12 @@ class InstallRustToolchain(unittest.TestCase):
                 stub.write_text(body)
                 stub.chmod(0o755)
             log = tmp_path / "rustup.log"
+            rustc_log = tmp_path / "rustc.log"
             env = {
                 **os.environ,
                 "PATH": f"{tmp_path / 'bin'}:{os.environ['PATH']}",
                 "RUSTUP_LOG": str(log),
+                "RUSTC_LOG": str(rustc_log),
                 "GITHUB_OUTPUT": str(tmp_path / "output"),
                 "GITHUB_ENV": str(tmp_path / "env"),
                 "COMPONENTS": "clippy",
@@ -86,6 +90,64 @@ class InstallRustToolchain(unittest.TestCase):
                 for c in calls
             ),
             calls,
+        )
+
+    def test_toolchain_file_wins_over_input_for_fingerprint(self) -> None:
+        path = ROOT / "setup-rust" / "action.yml"
+        step = drift.parse_steps(path.read_text(), path)["Install Rust toolchain"]
+        script = drift.fields(step)["run"]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            (tmp_path / "rust-toolchain.toml").write_text(
+                '[toolchain]\nchannel = "1.90"\n'
+            )
+            (tmp_path / "bin").mkdir()
+            for name, body in (("rustup", RUSTUP), ("rustc", RUSTC)):
+                stub = tmp_path / "bin" / name
+                stub.write_text(body)
+                stub.chmod(0o755)
+            log = tmp_path / "rustup.log"
+            rustc_log = tmp_path / "rustc.log"
+            env = {
+                **os.environ,
+                "PATH": f"{tmp_path / 'bin'}:{os.environ['PATH']}",
+                "RUSTUP_LOG": str(log),
+                "RUSTC_LOG": str(rustc_log),
+                "GITHUB_OUTPUT": str(tmp_path / "output"),
+                "GITHUB_ENV": str(tmp_path / "env"),
+                "COMPONENTS": "",
+                "TARGETS": "",
+                "RUN_CLIPPY": "false",
+                "RUN_FMT": "false",
+                "TOOLCHAIN": "1.98.1",
+                "CARGO_HOME": str(tmp_path / "cargo"),
+                "CARGO_TARGET_DIR": "",
+            }
+            subprocess.run(
+                ["bash", "-e", "-c", script],
+                cwd=tmp_path,
+                env=env,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            calls = log.read_text().splitlines()
+            rustc_calls = (
+                rustc_log.read_text().splitlines() if rustc_log.exists() else []
+            )
+
+        self.assertFalse(
+            any("1.98.1" in c for c in calls),
+            calls,
+        )
+        self.assertTrue(
+            any(c == "rustup toolchain install --no-self-update" for c in calls),
+            calls,
+        )
+        self.assertFalse(
+            any("+1.98.1" in c for c in rustc_calls),
+            rustc_calls,
         )
 
 
