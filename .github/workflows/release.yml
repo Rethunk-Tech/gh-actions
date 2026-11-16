@@ -22,9 +22,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: write
-    concurrency:
-      group: ${{ github.workflow }}-${{ github.ref }}
-      cancel-in-progress: false
+    # No job-level concurrency: the workflow-level group already serialises a tag's runs, and a
+    # job reusing its own workflow's group deadlocks, failing before any step runs.
     steps:
       # fetch-depth: 0 brings the annotated tag OBJECT, not just the commit it points at —
       # `git tag -l --format=%(contents:...)` reads the annotation, and a shallow checkout has
