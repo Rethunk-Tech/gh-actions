@@ -1,0 +1,2 @@
+[deviations]
+"patterns-ci-workflow-00002" = "release.yml publishes on a tag push: a run half way through publishing must finish, so a rerun of the same tag queues behind it (cancel-in-progress: false) instead of cancelling it."
