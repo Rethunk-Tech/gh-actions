@@ -90,6 +90,45 @@ class PlaywrightVersionPin(unittest.TestCase):
                 self.assertIn("version=1.64.1", self.resolve(action, "1.64.1"))
 
 
+class PlaywrightCacheHitEmptyDir(unittest.TestCase):
+    def probe(self, action: str, browsers: str) -> str:
+        script = step(action, "Install Playwright")["run"]
+        wrapper = (
+            'bunx() { echo "WOULD_INSTALL missing=${missing-?} argc=$#"; exit 0; }\n'
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp) / "home"
+            (home / ".cache" / "ms-playwright").mkdir(parents=True)
+            result = subprocess.run(
+                ["bash", "-e", "-c", wrapper + script],
+                env={
+                    **os.environ,
+                    "HOME": str(home),
+                    "PLAYWRIGHT_BROWSERS": browsers,
+                    "PLAYWRIGHT_CACHE_HIT": "true",
+                    "PLAYWRIGHT_VERSION": "1.64.1",
+                },
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            return result.stdout
+
+    def test_empty_cache_installs_default_set(self) -> None:
+        for action in drift.ACTIONS:
+            with self.subTest(action):
+                out = self.probe(action, "")
+                self.assertIn("WOULD_INSTALL", out)
+                self.assertNotIn("restored from cache", out)
+
+    def test_named_chromium_missing_installs(self) -> None:
+        for action in drift.ACTIONS:
+            with self.subTest(action):
+                out = self.probe(action, "chromium")
+                self.assertIn("WOULD_INSTALL", out)
+                self.assertNotIn("restored from cache", out)
+
+
 class ExtraCacheKey(unittest.TestCase):
     def test_key_separates_different_path_sets(self) -> None:
         for action in drift.ACTIONS:

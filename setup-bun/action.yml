@@ -359,8 +359,10 @@ runs:
         set -- $PLAYWRIGHT_BROWSERS
         # A hit is keyed by the browser set, but a restored directory can still lack one of the
         # requested browsers; install when any is absent rather than trusting the hit alone.
+        # The default set (no names) has nothing to glob; an empty cache dir is a miss too.
         if [ "$PLAYWRIGHT_CACHE_HIT" = "true" ]; then
           missing=0
+          [ -n "$(ls -A "$HOME/.cache/ms-playwright" 2>/dev/null)" ] || missing=1
           for b in "$@"; do
             ls -d "$HOME/.cache/ms-playwright/$b"-* >/dev/null 2>&1 || missing=1
           done
