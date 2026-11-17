@@ -1717,3 +1717,129 @@ jobs:
             echo "::error::skip-install gated or skipped uv audit; expected composite failure and audit-outcome=failure, got composite '$OUTCOME', audit '$AUDIT'" >&2
             exit 1
           fi
+
+  # One required check for branch protection: a matrix leg that never ran reads as "not failing" rather than "not run".
+  all-checks:
+    if: always()
+    needs:
+      - lint
+      - reset-self-test-caches
+      - test-setup-bun-cold
+      - test-setup-bun-warm
+      - test-setup-bun-extra-cache-cold
+      - test-setup-bun-extra-cache-warm
+      - test-setup-bun-extra-cache-paths-only-fail
+      - test-setup-bun-skip-install-cache
+      - test-setup-bun-skip-install-no-lockfile
+      - test-setup-bun-audit-pass
+      - test-setup-bun-audit-fail
+      - test-setup-bun-skip-install-audit
+      - test-setup-bun-test-pass
+      - test-setup-bun-test-fail
+      - test-setup-nextjs-bun-cold
+      - test-setup-nextjs-bun-warm
+      - test-setup-nextjs-bun-next-app-dir-cold
+      - test-setup-nextjs-bun-next-app-dir-warm
+      - test-setup-nextjs-bun-extra-cache-cold
+      - test-setup-nextjs-bun-extra-cache-warm
+      - test-setup-nextjs-bun-playwright-cold
+      - test-setup-nextjs-bun-playwright-warm
+      - test-setup-go-cache
+      - test-setup-go-prune-windows
+      - test-setup-go-cache-modules-only
+      - test-setup-go-no-module
+      - test-setup-rust-cache
+      - test-setup-rust-no-lockfile
+      - test-setup-rust-toolchain-input
+      - test-setup-rust-clippy-pass
+      - test-setup-rust-clippy-catches-real-issue
+      - test-setup-rust-fmt-catches-unformatted
+      - test-setup-rust-test-catches-failure
+      - test-setup-rust-audit
+      - test-audit-bun
+      - test-setup-bun-playwright-cold
+      - test-setup-bun-playwright-warm
+      - test-setup-bun-playwright-directory-cold
+      - test-setup-bun-playwright-directory-warm
+      - test-setup-go-lint-vuln-pass
+      - test-setup-go-govulncheck-fail
+      - test-setup-go-lint-catches-real-issue
+      - test-setup-go-race-catches-real-race
+      - test-setup-go-test-pass
+      - test-setup-go-test-fail
+      - test-setup-go-fmt-catches-unformatted
+      - test-setup-python-ruff-format-catches-unformatted
+      - test-setup-python-cold
+      - test-setup-python-warm
+      - test-setup-python-gates-pass
+      - test-setup-python-test-pass
+      - test-setup-python-test-fail
+      - test-setup-python-ruff-catches-real-issue
+      - test-setup-python-audit-fail
+      - test-setup-python-skip-install-no-project
+      - test-setup-python-skip-install-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Fail if any check did not succeed
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ] \
+            || [ "${{ needs.reset-self-test-caches.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-cold.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-warm.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-extra-cache-cold.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-extra-cache-warm.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-extra-cache-paths-only-fail.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-skip-install-cache.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-skip-install-no-lockfile.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-audit-pass.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-audit-fail.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-skip-install-audit.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-test-pass.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-test-fail.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-cold.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-warm.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-next-app-dir-cold.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-next-app-dir-warm.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-extra-cache-cold.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-extra-cache-warm.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-playwright-cold.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-playwright-warm.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-cache.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-prune-windows.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-cache-modules-only.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-no-module.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-rust-cache.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-rust-no-lockfile.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-rust-toolchain-input.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-rust-clippy-pass.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-rust-clippy-catches-real-issue.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-rust-fmt-catches-unformatted.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-rust-test-catches-failure.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-rust-audit.result }}" != "success" ] \
+            || [ "${{ needs.test-audit-bun.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-playwright-cold.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-playwright-warm.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-playwright-directory-cold.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-bun-playwright-directory-warm.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-lint-vuln-pass.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-govulncheck-fail.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-lint-catches-real-issue.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-race-catches-real-race.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-test-pass.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-test-fail.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-fmt-catches-unformatted.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-python-ruff-format-catches-unformatted.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-python-cold.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-python-warm.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-python-gates-pass.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-python-test-pass.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-python-test-fail.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-python-ruff-catches-real-issue.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-python-audit-fail.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-python-skip-install-no-project.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-python-skip-install-audit.result }}" != "success" ]; then
+            echo "lint=${{ needs.lint.result }} reset-self-test-caches=${{ needs.reset-self-test-caches.result }} test-setup-bun-cold=${{ needs.test-setup-bun-cold.result }} test-setup-bun-warm=${{ needs.test-setup-bun-warm.result }} test-setup-bun-extra-cache-cold=${{ needs.test-setup-bun-extra-cache-cold.result }} test-setup-bun-extra-cache-warm=${{ needs.test-setup-bun-extra-cache-warm.result }} test-setup-bun-extra-cache-paths-only-fail=${{ needs.test-setup-bun-extra-cache-paths-only-fail.result }} test-setup-bun-skip-install-cache=${{ needs.test-setup-bun-skip-install-cache.result }} test-setup-bun-skip-install-no-lockfile=${{ needs.test-setup-bun-skip-install-no-lockfile.result }} test-setup-bun-audit-pass=${{ needs.test-setup-bun-audit-pass.result }} test-setup-bun-audit-fail=${{ needs.test-setup-bun-audit-fail.result }} test-setup-bun-skip-install-audit=${{ needs.test-setup-bun-skip-install-audit.result }} test-setup-bun-test-pass=${{ needs.test-setup-bun-test-pass.result }} test-setup-bun-test-fail=${{ needs.test-setup-bun-test-fail.result }} test-setup-nextjs-bun-cold=${{ needs.test-setup-nextjs-bun-cold.result }} test-setup-nextjs-bun-warm=${{ needs.test-setup-nextjs-bun-warm.result }} test-setup-nextjs-bun-next-app-dir-cold=${{ needs.test-setup-nextjs-bun-next-app-dir-cold.result }} test-setup-nextjs-bun-next-app-dir-warm=${{ needs.test-setup-nextjs-bun-next-app-dir-warm.result }} test-setup-nextjs-bun-extra-cache-cold=${{ needs.test-setup-nextjs-bun-extra-cache-cold.result }} test-setup-nextjs-bun-extra-cache-warm=${{ needs.test-setup-nextjs-bun-extra-cache-warm.result }} test-setup-nextjs-bun-playwright-cold=${{ needs.test-setup-nextjs-bun-playwright-cold.result }} test-setup-nextjs-bun-playwright-warm=${{ needs.test-setup-nextjs-bun-playwright-warm.result }} test-setup-go-cache=${{ needs.test-setup-go-cache.result }} test-setup-go-prune-windows=${{ needs.test-setup-go-prune-windows.result }} test-setup-go-cache-modules-only=${{ needs.test-setup-go-cache-modules-only.result }} test-setup-go-no-module=${{ needs.test-setup-go-no-module.result }} test-setup-rust-cache=${{ needs.test-setup-rust-cache.result }} test-setup-rust-no-lockfile=${{ needs.test-setup-rust-no-lockfile.result }} test-setup-rust-toolchain-input=${{ needs.test-setup-rust-toolchain-input.result }} test-setup-rust-clippy-pass=${{ needs.test-setup-rust-clippy-pass.result }} test-setup-rust-clippy-catches-real-issue=${{ needs.test-setup-rust-clippy-catches-real-issue.result }} test-setup-rust-fmt-catches-unformatted=${{ needs.test-setup-rust-fmt-catches-unformatted.result }} test-setup-rust-test-catches-failure=${{ needs.test-setup-rust-test-catches-failure.result }} test-setup-rust-audit=${{ needs.test-setup-rust-audit.result }} test-audit-bun=${{ needs.test-audit-bun.result }} test-setup-bun-playwright-cold=${{ needs.test-setup-bun-playwright-cold.result }} test-setup-bun-playwright-warm=${{ needs.test-setup-bun-playwright-warm.result }} test-setup-bun-playwright-directory-cold=${{ needs.test-setup-bun-playwright-directory-cold.result }} test-setup-bun-playwright-directory-warm=${{ needs.test-setup-bun-playwright-directory-warm.result }} test-setup-go-lint-vuln-pass=${{ needs.test-setup-go-lint-vuln-pass.result }} test-setup-go-govulncheck-fail=${{ needs.test-setup-go-govulncheck-fail.result }} test-setup-go-lint-catches-real-issue=${{ needs.test-setup-go-lint-catches-real-issue.result }} test-setup-go-race-catches-real-race=${{ needs.test-setup-go-race-catches-real-race.result }} test-setup-go-test-pass=${{ needs.test-setup-go-test-pass.result }} test-setup-go-test-fail=${{ needs.test-setup-go-test-fail.result }} test-setup-go-fmt-catches-unformatted=${{ needs.test-setup-go-fmt-catches-unformatted.result }} test-setup-python-ruff-format-catches-unformatted=${{ needs.test-setup-python-ruff-format-catches-unformatted.result }} test-setup-python-cold=${{ needs.test-setup-python-cold.result }} test-setup-python-warm=${{ needs.test-setup-python-warm.result }} test-setup-python-gates-pass=${{ needs.test-setup-python-gates-pass.result }} test-setup-python-test-pass=${{ needs.test-setup-python-test-pass.result }} test-setup-python-test-fail=${{ needs.test-setup-python-test-fail.result }} test-setup-python-ruff-catches-real-issue=${{ needs.test-setup-python-ruff-catches-real-issue.result }} test-setup-python-audit-fail=${{ needs.test-setup-python-audit-fail.result }} test-setup-python-skip-install-no-project=${{ needs.test-setup-python-skip-install-no-project.result }} test-setup-python-skip-install-audit=${{ needs.test-setup-python-skip-install-audit.result }}"
+            exit 1
+          fi
+          echo "all checks passed"
