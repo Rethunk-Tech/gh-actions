@@ -156,7 +156,8 @@ Go toolchain via `actions/setup-go`, plus a module/build cache keyed per job. Op
 runs `go test ./...`, `go test -race ./...`, golangci-lint, `golangci-lint fmt --diff`, and/or
 govulncheck as gates on the same job — opt-in, off by default. `go test` and `go test -race`
 are separate inputs: `run-test` does not pass `-race`, and `run-test-race` does not run the
-plain suite.
+plain suite. Cross-compiles for Windows on the existing runner by default; set
+`run-windows-compile` to `"false"` in a repo that does not support Windows.
 
 ```yaml
 - uses: actions/checkout@v7
@@ -167,9 +168,10 @@ plain suite.
     # cache-dependency-path: "**/go.sum"  # default: the go.sum next to go-version-file, plus go-version-file
     # cache-build: "false"
     # cache-key-suffix: ${{ steps.day.outputs.date }}  # refresh the build cache on this schedule
+    # run-windows-compile: "false"  # default true; set false if the module does not support Windows
 ```
 
-Outputs: `go-version`, `cache-hit` (an exact key match for this job), `cache-mode` (`build` when the module and build caches are stored, `modules` when `cache-build` is `"false"`, `off` when `cache` is `"false"`), and `test-outcome`, `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
+Outputs: `go-version`, `cache-hit` (an exact key match for this job), `cache-mode` (`build` when the module and build caches are stored, `modules` when `cache-build` is `"false"`, `off` when `cache` is `"false"`), and `test-outcome`, `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome`, `windows-compile-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
 
 The cache key is Go version + dependency hash + job id, so a job with `run-test-race` enabled and
 a lint-only job each restore the build cache they filled themselves — a lint job's cache is never
@@ -203,6 +205,20 @@ lint/vuln-only callers do not start running tests.
 - uses: Rethunk-Tech/gh-actions/setup-go@v1.25
   with:
     run-test-race: "true"
+    go-version-file: backend/go.mod
+```
+
+**Windows compile** — on by default. Runs `GOOS=windows go test -exec=true ./...` from the
+same module directory so `*_windows.go` and `//go:build windows` files are type-checked on the
+existing Linux runner. `-exec=true` links each test binary then invokes `true` instead of
+running it. Set `run-windows-compile` to `"false"` in a repo that does not support Windows, in a
+tools-only caller that has no module, or when `cache-dependency-path` is a glob (no
+single module directory).
+
+```yaml
+- uses: Rethunk-Tech/gh-actions/setup-go@v1.25
+  with:
+    # run-windows-compile: "false"   # default true
     go-version-file: backend/go.mod
 ```
 

@@ -4,6 +4,8 @@ description: >
   (cache-build false stores modules only).
   Optionally also run `go test ./...`, the race-enabled test suite, golangci-lint,
   golangci-lint fmt, and/or govulncheck as gates on the same job — opt-in, off by default.
+  Cross-compiles for Windows on the existing runner by default (`GOOS=windows go test
+  -exec=true ./...`) so `*_windows.go` is type-checked without a Windows runner.
   Writes a pass/fail table to the job's step summary.
 
 inputs:
@@ -62,6 +64,15 @@ inputs:
       not enable the race gate. Off by default.
     required: false
     default: "false"
+  run-windows-compile:
+    description: >
+      When true, cross-compiles every package for Windows (`GOOS=windows go test -exec=true
+      ./...`) from the module directory after the toolchain is set up. `-exec=true` links
+      each test binary then invokes `true` instead of running it, so Windows-only sources
+      are type-checked on the existing Linux runner. Default true; set false in a repo that
+      does not support Windows.
+    required: false
+    default: "true"
   run-lint:
     description: >
       When true, downloads golangci-lint (checksum-verified against its release) and runs
@@ -132,6 +143,9 @@ outputs:
   govulncheck-outcome:
     description: Outcome of the govulncheck gate (success, failure or skipped when run-govulncheck is off).
     value: ${{ steps.govulncheck.outcome }}
+  windows-compile-outcome:
+    description: Outcome of the Windows compile gate (success, failure or skipped when run-windows-compile is off).
+    value: ${{ steps.windows-compile.outcome }}
 
 runs:
   using: composite
@@ -162,7 +176,7 @@ runs:
         CACHE_DEPENDENCY_PATH: ${{ inputs.cache-dependency-path }}
         # hashFiles takes one glob per argument; a newline-joined list is one unmatched pattern.
         HASH_FILES_SINGLE: ${{ hashFiles(inputs.cache-dependency-path) }}
-        NEEDS_DIR: ${{ inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' }}
+        NEEDS_DIR: ${{ inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' || inputs.run-windows-compile == 'true' }}
       run: |
         . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
         hash_listed() {
@@ -214,7 +228,7 @@ runs:
         case "$path" in
           *$'\n'*|*'*'*)
             if [ "$NEEDS_DIR" = "true" ]; then
-              echo "::error::$(github_encode "run-test/run-test-race/run-lint/run-fmt/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave the gate inputs off for this caller.")" >&2
+              echo "::error::$(github_encode "run-test/run-test-race/run-lint/run-fmt/run-govulncheck/run-windows-compile can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave the gate inputs off for this caller.")" >&2
               exit 1
             fi
             ;;
@@ -352,6 +366,18 @@ runs:
       working-directory: ${{ steps.moddir.outputs.dir }}
       run: go test -race ./...
 
+    # Linux jobs never type-check *_windows.go / //go:build windows; -exec=true links each
+    # test binary then invokes true so this stays a compile check, no Windows runner.
+    - name: Windows compile
+      id: windows-compile
+      if: inputs.run-windows-compile == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ steps.moddir.outputs.dir }}
+      env:
+        GOOS: windows
+      run: go test -exec=true ./...
+
     - name: golangci-lint
       id: lint
       if: inputs.run-lint == 'true'
@@ -431,7 +457,7 @@ runs:
     # business opinionating about. A caller that wants that keeps its own downstream step
     # reading govulncheck's `-json` output directly instead of enabling run-govulncheck here.
     - name: Gate on test/lint/fmt/govulncheck results
-      if: inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true'
+      if: inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' || inputs.run-windows-compile == 'true'
       shell: bash
       env:
         RUN_TEST: ${{ inputs.run-test }}
@@ -439,11 +465,13 @@ runs:
         RUN_LINT: ${{ inputs.run-lint }}
         RUN_FMT: ${{ inputs.run-fmt }}
         RUN_VULN: ${{ inputs.run-govulncheck }}
+        RUN_WINDOWS_COMPILE: ${{ inputs.run-windows-compile }}
         TEST_OUTCOME: ${{ steps.test.outcome }}
         TEST_RACE_OUTCOME: ${{ steps.test-race.outcome }}
         LINT_OUTCOME: ${{ steps.lint.outcome }}
         FMT_OUTCOME: ${{ steps.fmt.outcome }}
         VULN_OUTCOME: ${{ steps.govulncheck.outcome }}
+        WINDOWS_COMPILE_OUTCOME: ${{ steps.windows-compile.outcome }}
       run: |
         row() {
           local enabled="$1" outcome="$2" label="$3"
@@ -465,6 +493,7 @@ runs:
         row "$RUN_LINT" "$LINT_OUTCOME" "golangci-lint"
         row "$RUN_FMT" "$FMT_OUTCOME" "golangci-lint fmt --diff"
         row "$RUN_VULN" "$VULN_OUTCOME" "govulncheck"
+        row "$RUN_WINDOWS_COMPILE" "$WINDOWS_COMPILE_OUTCOME" "Windows compile"
 
         failed=0
         if [ "$TEST_OUTCOME" = "failure" ]; then
@@ -485,6 +514,10 @@ runs:
         fi
         if [ "$VULN_OUTCOME" = "failure" ]; then
           echo "::error::govulncheck found vulnerabilities — see the govulncheck step above" >&2
+          failed=1
+        fi
+        if [ "$WINDOWS_COMPILE_OUTCOME" = "failure" ]; then
+          echo "::error::Windows compile failed — see the Windows compile step above" >&2
           failed=1
         fi
         exit "$failed"
