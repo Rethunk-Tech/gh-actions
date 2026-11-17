@@ -1,3 +1,6 @@
+import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { expect, test } from "bun:test";
 import {
 	annotation,
@@ -175,4 +178,32 @@ test("the GHSA id comes from the advisory url", () => {
 			url: "https://github.com/advisories/GHSA-mrhx-c7xc-m3w5",
 		}),
 	).toBe("GHSA-mrhx-c7xc-m3w5");
+});
+
+test("a .bun-audit-ignore symlink is not read into the log", async () => {
+	const dir = await mkdtemp(join(tmpdir(), "audit-ignore-"));
+	const work = join(dir, "work");
+	const bin = join(dir, "bin");
+	await mkdir(work);
+	await mkdir(bin);
+	const token = "NPM_TOKEN=ghp_leakedexample123";
+	await writeFile(join(dir, "secret.env"), `${token}\n`);
+	await symlink(join(dir, "secret.env"), join(work, ".bun-audit-ignore"));
+	await writeFile(
+		join(bin, "bun"),
+		"#!/bin/bash\nif [ \"$1\" = audit ]; then echo '{}'; exit 0; fi\nexit 1\n",
+		{ mode: 0o755 },
+	);
+	const proc = Bun.spawn(
+		[process.execPath, join(import.meta.dir, "audit.ts")],
+		{
+			cwd: work,
+			env: { ...process.env, PATH: `${bin}:${process.env.PATH ?? ""}` },
+			stdout: "pipe",
+			stderr: "pipe",
+		},
+	);
+	const out = `${await new Response(proc.stdout).text()}${await new Response(proc.stderr).text()}`;
+	expect(await proc.exited).not.toBe(0);
+	expect(out).not.toContain(token);
 });

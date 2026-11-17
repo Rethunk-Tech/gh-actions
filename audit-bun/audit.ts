@@ -1,3 +1,5 @@
+import { lstat } from "node:fs/promises";
+
 // Fails only on advisories whose fix has shipped and the repo has not ignored; the rest warn.
 
 interface Advisory {
@@ -126,6 +128,31 @@ export async function latestVersion(pkg: string): Promise<string | undefined> {
 	}
 }
 
+function isEnoent(err: unknown): boolean {
+	return (
+		typeof err === "object" &&
+		err !== null &&
+		"code" in err &&
+		err.code === "ENOENT"
+	);
+}
+
+/** Regular file only: a symlink would be read into the parse error annotation. */
+async function ignoreFileText(): Promise<string> {
+	try {
+		const st = await lstat(".bun-audit-ignore");
+		if (!st.isFile()) {
+			throw new TypeError(".bun-audit-ignore must be a regular file");
+		}
+		return await Bun.file(".bun-audit-ignore").text();
+	} catch (err) {
+		if (isEnoent(err)) {
+			return "";
+		}
+		throw err;
+	}
+}
+
 async function why(pkg: string): Promise<string> {
 	const proc = Bun.spawn(["bun", "why", pkg], {
 		stdout: "pipe",
@@ -157,10 +184,7 @@ async function main(): Promise<number> {
 	const names = Object.keys(report);
 	const versions = await Promise.all(names.map((n) => latestVersion(n)));
 	const latest = Object.fromEntries(names.map((n, i) => [n, versions[i]]));
-	const ignoreFile = Bun.file(".bun-audit-ignore");
-	const ignores = parseIgnores(
-		(await ignoreFile.exists()) ? await ignoreFile.text() : "",
-	);
+	const ignores = parseIgnores(await ignoreFileText());
 	const classified = classify(report, latest);
 	const seen = new Set<string>();
 	const fixable = classified.fixable.filter((f) => {
