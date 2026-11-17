@@ -1607,11 +1607,11 @@ jobs:
             exit 1
           fi
 
-  # Proves the lint gate actually fires rather than silently no-op'ing — a fixture with a real
-  # F401 (an unused `os` import), confirmed locally to import clean but fail `ruff check` — and
-  # that uv audit still runs (continue-on-error on each internal step) even though ruff already
-  # failed, so a caller with both enabled sees both findings in one run. The outer
-  # continue-on-error captures the composite step's own outcome instead of failing the job.
+  # Proves the lint gate actually fires rather than silently no-op'ing — a fixture with an
+  # unused `os` import, which imports clean but fails `ruff check` — and that uv audit still
+  # runs (continue-on-error on each internal step) even though ruff already failed, so a
+  # caller with both enabled sees both findings in one run. The outer continue-on-error
+  # captures the composite step's own outcome instead of failing the job.
   test-setup-python-ruff-catches-real-issue:
     name: setup-python self-test (ruff gate fires, audit still runs anyway)
     needs: reset-self-test-caches

@@ -1,4 +1,4 @@
-# `os` is never used: ruff's default rule set flags it as F401. Imports cleanly at runtime,
+# `os` is never used: ruff's default rule set flags unused imports. Imports cleanly at runtime,
 # so only the lint gate can catch it.
 import os
 

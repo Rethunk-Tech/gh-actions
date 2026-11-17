@@ -44,14 +44,14 @@ snapshots of CJK or Thai text in CI should install those fonts itself. Combined 
 unpinned `bunx playwright`.
 
 **Caching a build directory too** — a path the repo owns that should not be keyed on the
-lockfile, such as a Turborepo `.turbo`. `extra-cache-paths` and `extra-cache-key` are both
-required for the cache to run at all; setting exactly one fails the job with an
-error that names both (`extra-cache-restore-key-fragment` is optional). Paths
-use `actions/cache` `path` form (newline-separated for more than one). Leaving the restore
-fragment empty restores from any previous extra cache for this OS and architecture. Prefer a
-key built from the content's inputs. A commit-SHA key never repeats, so every run uploads a
-fresh full-size entry: caldera saved 1.6 GB per run that way and flushed the repo's 10 GB cache
-quota. Use a SHA key only for a small cache:
+lockfile, such as a Turborepo `.turbo`.
+
+| Input | Rule |
+| --- | --- |
+| `extra-cache-paths` and `extra-cache-key` | both required; setting exactly one fails the job with an error that names both |
+| `extra-cache-restore-key-fragment` | optional; empty restores from any previous extra cache for this OS and architecture |
+| Paths | `actions/cache` `path` form (newline-separated for more than one) |
+| Key | prefer one built from the content's inputs. A commit-SHA key never repeats, so every run uploads a fresh full-size entry and can flush the repo's 10 GB cache quota (caldera: 1.6 GB per run). Use a SHA key only for a small cache. |
 
 ```yaml
 - uses: Rethunk-Tech/gh-actions/setup-bun@v1.25
