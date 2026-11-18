@@ -1,3 +1,2 @@
 [deviations]
-patterns-release-00003 = "this repository publishes composite actions by git tag; there are no artefacts to build or attest"
 patterns-repo-settings-00001 = "CodeQL analyzes every language this repository holds (actions, javascript-typescript, python) on a staggered schedule, not the go-archive artifact's Go autobuild matrix"
