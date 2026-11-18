@@ -129,7 +129,7 @@ passes clean.
 
 The only thing that catches a broken expression, a bad cache key, or a caching mechanism that
 silently never saves is actually running the action — locally with [`act`](https://github.com/nektos/act)
-before committing, and in CI via `.github/workflows/ci.yml`'s self-test jobs (`test-setup-bun-cold`
+before committing (`scripts/act-callers.sh`, run by the lefthook pre-push hook whenever an `action.yml` changes, runs the callers in `scripts/act-callers.txt` against this tree), and in CI via `.github/workflows/ci.yml`'s self-test jobs (`test-setup-bun-cold`
 → `test-setup-bun-warm`, same pattern for `setup-nextjs-bun`, `setup-go`, `setup-python` and
 `setup-rust`) after. Each gate-bearing action also gets a fixture that compiles/imports and
 passes without its gate, so only the gate can catch it:
