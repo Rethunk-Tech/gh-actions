@@ -392,7 +392,15 @@ runs:
       working-directory: ${{ steps.moddir.outputs.dir }}
       env:
         GOOS: windows
-      run: go test -exec=true ./...
+      run: |
+        # A go.work root with modules in subdirectories matches nothing under ./..., so name each module.
+        pkgs=./...
+        if [ -f go.work ] && [ ! -f go.mod ]; then
+          pkgs=$(go list -m -f '{{.Path}}/...')
+        fi
+        # Module paths hold no spaces; word-splitting the list is intentional.
+        # shellcheck disable=SC2086
+        go test -exec=true $pkgs
 
     - name: golangci-lint
       id: lint
