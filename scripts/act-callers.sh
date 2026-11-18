@@ -12,7 +12,7 @@ src=${ACT_CALLERS_SRC:-/usr/local/src/com.github}
 logs=${XDG_CACHE_HOME:-$HOME/.cache}/act-callers
 only=${ACT_CALLERS_ONLY:-}
 mkdir -p "$logs"
-for t in act yq; do
+for t in act docker; do
   command -v "$t" >/dev/null || {
     echo "act-callers: $t not installed" >&2
     exit 1
@@ -23,6 +23,15 @@ tmp=$(mktemp -d "${TMPDIR:-/var/tmp}/act-callers.XXXXXX")
 trap 'rm -rf --one-file-system -- "$tmp"' EXIT
 mkdir "$tmp/tree"
 git -C "$here" archive "$ref" | tar -x -C "$tmp/tree"
+
+# act-latest lacks tools GitHub's ubuntu runner ships; add each one only when missing, so callers'
+# own steps run as they do in CI. Docker's layer cache makes this a no-op after the first build.
+image=act-callers-runner:latest
+docker build -q -t "$image" - >/dev/null <<'DOCKERFILE'
+FROM catthehacker/ubuntu:act-latest
+RUN missing=""; for t in shellcheck; do command -v "$t" >/dev/null || missing="$missing $t"; done; \
+    if [ -n "$missing" ]; then apt-get update && apt-get install -y --no-install-recommends $missing && rm -rf /var/lib/apt/lists/*; fi
+DOCKERFILE
 
 fail=0 ran=0
 while read -r repo wf job extra; do
@@ -52,21 +61,11 @@ while read -r repo wf job extra; do
   log="$logs/$(basename "$repo")-$job.log"
   ran=$((ran + 1))
   # shellcheck disable=SC2086 # extra holds the caller line's own act flags
-  (cd "$dir" && act push -W ".github/workflows/$wf" -j "$job" "${args[@]}" \
-    -P ubuntu-latest=catthehacker/ubuntu:act-latest $extra) >"$log" 2>&1 && rc=0 || rc=$?
-  # Judge only the steps that call this repo: the act image lacks tools GitHub's runner has
-  # (shellcheck, browsers), so a caller's own later step can fail here for reasons CI never sees.
-  # The last result line for a step name is the outer step; composite inner steps print first.
-  bad=""
-  while IFS= read -r step; do
-    last=$(grep -E "(Success|Failure) - Main $(printf '%s' "$step" | sed 's/[][\.*^$/]/\\&/g') \[" "$log" | tail -1)
-    case "$last" in *Success*) ;; *) bad+="${bad:+, }$step${last:+ failed}${last:- never ran}" ;; esac
-  done < <(yq ".jobs.\"$job\".steps[] | select(.uses // \"\" | test(\"Rethunk-Tech/gh-actions/\")) | (.name // .uses)" "$dir/.github/workflows/$wf")
-  if [ -z "$bad" ]; then
-    [ "$rc" -eq 0 ] && note="" || note=" (a caller-only step failed under act; see $log)"
-    echo "act-callers: ok   $repo $wf/$job$note"
+  if (cd "$dir" && act push -W ".github/workflows/$wf" -j "$job" "${args[@]}" \
+    -P "ubuntu-latest=$image" --pull=false $extra) >"$log" 2>&1; then
+    echo "act-callers: ok   $repo $wf/$job"
   else
-    echo "act-callers: FAIL $repo $wf/$job: $bad"
+    echo "act-callers: FAIL $repo $wf/$job"
     grep -E '❌|::error|Error:' "$log" | tail -8 >&2
     echo "act-callers: full log $log" >&2
     fail=1
