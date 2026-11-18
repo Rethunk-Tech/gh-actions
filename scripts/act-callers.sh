@@ -31,6 +31,10 @@ docker build -q -t "$image" - >/dev/null <<'DOCKERFILE'
 FROM catthehacker/ubuntu:act-latest
 RUN missing=""; for t in shellcheck; do command -v "$t" >/dev/null || missing="$missing $t"; done; \
     if [ -n "$missing" ]; then apt-get update && apt-get install -y --no-install-recommends $missing && rm -rf /var/lib/apt/lists/*; fi
+RUN command -v google-chrome >/dev/null || { \
+      curl -fsSLo /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+      apt-get update && apt-get install -y --no-install-recommends /tmp/chrome.deb && \
+      rm -rf /tmp/chrome.deb /var/lib/apt/lists/*; }
 DOCKERFILE
 
 fail=0 ran=0
