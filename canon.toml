@@ -1,1 +1,2 @@
 [deviations]
+patterns-release-00001 = "jobs keep the main-ancestor check before moving the floating major and omit a no-op build job, because this repository publishes composite actions by tag rather than attested artefacts"
