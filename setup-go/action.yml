@@ -176,7 +176,7 @@ runs:
         CACHE_DEPENDENCY_PATH: ${{ inputs.cache-dependency-path }}
         # hashFiles takes one glob per argument; a newline-joined list is one unmatched pattern.
         HASH_FILES_SINGLE: ${{ hashFiles(inputs.cache-dependency-path) }}
-        NEEDS_DIR: ${{ inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' || inputs.run-windows-compile == 'true' }}
+        NEEDS_DIR: ${{ inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' }}
       run: |
         . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
         hash_listed() {
@@ -223,20 +223,36 @@ runs:
           SETUP_GO_DEPS_HASH=$(printf '%s\n' "$(dirname "$GO_VERSION_FILE")/go.sum" "$GO_VERSION_FILE" | hash_listed)
         fi
         echo "SETUP_GO_DEPS_HASH=$SETUP_GO_DEPS_HASH" >> "$GITHUB_ENV"
-        # A multi-line (multi-module) or glob value has no single dirname. Only the gates need
-        # one; fail loudly for them rather than derive a wrong directory.
+        # A glob, or a list spanning several directories, has no single dirname: go-version-file
+        # names the module root when given. The explicit gates fail loudly rather than guess;
+        # the default-on Windows compile just skips.
+        dir=""
         case "$path" in
-          *$'\n'*|*'*'*)
-            if [ "$NEEDS_DIR" = "true" ]; then
-              echo "::error::$(github_encode "run-test/run-test-race/run-lint/run-fmt/run-govulncheck/run-windows-compile can't derive a working directory from a multi-line or glob cache-dependency-path/go-version-file value ('$path') — pass a single literal path, or leave the gate inputs off for this caller.")" >&2
-              exit 1
-            fi
+          *'*'*) ;;
+          *$'\n'*)
+            dirs=$(printf '%s\n' "$path" | sed '/^[[:space:]]*$/d' | while IFS= read -r p; do dirname "$p"; done | sort -u)
+            case "$dirs" in *$'\n'*) ;; *) dir="$dirs" ;; esac
             ;;
           *)
             github_require_single_line go-version-file "$path"
-            echo "dir=$(dirname "$path")" >> "$GITHUB_OUTPUT"
+            dir=$(dirname "$path")
             ;;
         esac
+        if [ -z "$dir" ] && [ -n "$GO_VERSION_FILE" ]; then
+          github_require_single_line go-version-file "$GO_VERSION_FILE"
+          dir=$(dirname "$GO_VERSION_FILE")
+        fi
+        if [ -z "$dir" ] && [ "$NEEDS_DIR" = "true" ]; then
+          echo "::error::$(github_encode "run-test/run-test-race/run-lint/run-fmt/run-govulncheck can't derive a working directory from a multi-line or glob cache-dependency-path value ('$path') — set go-version-file, pass a single literal path, or leave the gate inputs off for this caller.")" >&2
+          exit 1
+        fi
+        if [ -n "$dir" ]; then
+          echo "dir=$dir" >> "$GITHUB_OUTPUT"
+          # A caller that only installs Go tools has no module to cross-compile.
+          if [ -f "$dir/go.mod" ] || [ -f "$dir/go.work" ]; then
+            echo "module=true" >> "$GITHUB_OUTPUT"
+          fi
+        fi
         {
           echo "SETUP_GO_BUILD_CACHE=$(go env GOCACHE)"
           echo "SETUP_GO_MOD_CACHE=$(go env GOMODCACHE)"
@@ -370,7 +386,7 @@ runs:
     # test binary then invokes true so this stays a compile check, no Windows runner.
     - name: Windows compile
       id: windows-compile
-      if: inputs.run-windows-compile == 'true'
+      if: inputs.run-windows-compile == 'true' && steps.moddir.outputs.module == 'true'
       continue-on-error: true
       shell: bash
       working-directory: ${{ steps.moddir.outputs.dir }}

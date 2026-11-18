@@ -816,16 +816,41 @@ jobs:
         with:
           go-version: "1.27.4"
           cache-build: "false"
-          run-windows-compile: "false"
-      - name: assert Windows compile stayed off
+      # run-windows-compile left at its default: a tools-only caller has nothing to compile.
+      - name: assert Windows compile skipped
         env:
           WINDOWS: ${{ steps.setup.outputs.windows-compile-outcome }}
         run: |
           if [ "$WINDOWS" != "skipped" ]; then
-            echo "::error::expected windows-compile-outcome=skipped when run-windows-compile is false, got '$WINDOWS'" >&2
+            echo "::error::expected windows-compile-outcome=skipped for a caller with no module, got '$WINDOWS'" >&2
             exit 1
           fi
       - run: go version
+
+  test-setup-go-multiline-cache-path:
+    name: setup-go self-test (multi-line cache-dependency-path, default Windows compile)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./setup-go
+        with:
+          go-version: "1.27.4"
+          cache-build: "false"
+          cache-dependency-path: |
+            .github/test-fixtures/go-app/go.mod
+            .github/test-fixtures/go-app/go.sum
+      - name: assert Windows compile ran in the listed module
+        env:
+          WINDOWS: ${{ steps.setup.outputs.windows-compile-outcome }}
+        run: |
+          if [ "$WINDOWS" != "success" ]; then
+            echo "::error::expected windows-compile-outcome=success for a one-directory multi-line list, got '$WINDOWS'" >&2
+            exit 1
+          fi
 
   # Same one-job, two-leg shape as test-setup-go-cache: setup-rust also keys on github.job.
   # The fixture's rust-toolchain.toml names clippy, so clippy running proves the toolchain-file
@@ -1816,6 +1841,7 @@ jobs:
       - test-setup-go-test-fail
       - test-setup-go-fmt-catches-unformatted
       - test-setup-go-windows-compile-fail
+      - test-setup-go-multiline-cache-path
       - test-setup-python-ruff-format-catches-unformatted
       - test-setup-python-cold
       - test-setup-python-warm
@@ -1878,6 +1904,7 @@ jobs:
             || [ "${{ needs.test-setup-go-test-fail.result }}" != "success" ] \
             || [ "${{ needs.test-setup-go-fmt-catches-unformatted.result }}" != "success" ] \
             || [ "${{ needs.test-setup-go-windows-compile-fail.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-multiline-cache-path.result }}" != "success" ] \
             || [ "${{ needs.test-setup-python-ruff-format-catches-unformatted.result }}" != "success" ] \
             || [ "${{ needs.test-setup-python-cold.result }}" != "success" ] \
             || [ "${{ needs.test-setup-python-warm.result }}" != "success" ] \
