@@ -1,2 +1,0 @@
-[deviations]
-patterns-repo-settings-00001 = "CodeQL analyzes every language this repository holds (actions, javascript-typescript, python) on a staggered schedule, not the go-archive artifact's Go autobuild matrix"
