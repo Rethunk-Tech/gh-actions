@@ -4,6 +4,8 @@
 # Usage: scripts/act-callers.sh [REF]   (default: the working tree's HEAD)
 # ACT_CALLERS_ONLY=substr limits the run to matching callers; logs stay in ~/.cache/act-callers.
 # Callers: scripts/act-callers.txt, one "Org/repo workflow job [act args...]" per line.
+# A full pass (every caller ran and passed, no ACT_CALLERS_ONLY) stamps REF's sha into
+# ~/.cache/nomad-hud/act-stamp, which nomad-hud's guard requires before a push, tag or pin bump.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
@@ -77,4 +79,10 @@ while read -r repo wf job extra; do
 done <"$here/scripts/act-callers.txt"
 
 echo "act-callers: $ran caller job(s) run, ref $ref"
+if [ "$fail" -eq 0 ] && [ "$ran" -gt 0 ] && [ -z "$only" ]; then
+  stamp_dir=$HOME/.cache/nomad-hud
+  mkdir -p "$stamp_dir"
+  git -C "$here" rev-parse "$ref" >"$stamp_dir/act-stamp.tmp"
+  mv "$stamp_dir/act-stamp.tmp" "$stamp_dir/act-stamp"
+fi
 exit "$fail"
