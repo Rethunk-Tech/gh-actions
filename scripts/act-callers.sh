@@ -10,7 +10,8 @@ set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
 ref=${1:-HEAD}
-src=${ACT_CALLERS_SRC:-/usr/local/src/com.github}
+src=${ACT_CALLERS_SRC:-$(bosun roots 2>/dev/null | grep com.github | head -1)}
+src=${src:-/usr/local/src/com.github}
 logs=${XDG_CACHE_HOME:-$HOME/.cache}/act-callers
 only=${ACT_CALLERS_ONLY:-}
 mkdir -p "$logs"
