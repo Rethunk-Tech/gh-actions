@@ -115,7 +115,7 @@ passes clean.
 
 The only thing that catches a broken expression, a bad cache key, or a caching mechanism that
 silently never saves is actually running the action — locally with [`act`](https://github.com/nektos/act)
-before committing (`scripts/act-callers.sh`, run by the lefthook pre-push hook whenever an `action.yml` changes, runs the callers in `scripts/act-callers.txt` against this tree), and in CI via `.github/workflows/ci.yml`'s self-test jobs (`test-setup-bun-cold`
+before committing (`scripts/act-callers.sh`, run by the lefthook pre-push hook whenever a file under an action directory or `scripts/` changes, runs `ci.yml`'s Linux self-test jobs and then the callers in `scripts/act-callers.txt` against this tree; both must pass for it to stamp the sha), and in CI via `.github/workflows/ci.yml`'s self-test jobs (`test-setup-bun-cold`
 → `test-setup-bun-warm`, same pattern for `setup-nextjs-bun`, `setup-go`, `setup-python` and
 `setup-rust`) after. Each gate-bearing action also gets a fixture that compiles/imports and
 passes without its gate, so only the gate can catch it:
@@ -148,6 +148,11 @@ to get wrong when writing that kind of test:
   cache-server-path), not two calls in one job.
 - Locally, use a real fixture with a real `bun.lock` — `bun install` in a scratch directory
   generates one; don't hand-write a plausible-looking lockfile.
+- The self-tests run under act need three workarounds, all built into `scripts/act-callers.sh`: act
+  cannot parse `uses: $/...`, so a scratch copy rewrites those to the sha; the copy is committed, since
+  gorelease refuses a dirty tree; and every run gets a fresh cache dir, because `reset-self-test-caches`
+  calls `gh`, which the runner image lacks, so a reused dir fails every cold assertion. Windows legs
+  cannot run under act and are covered by CI on a canary only.
 - act needs Docker and a persistent cache-server-path to actually exercise `actions/cache`
   restore/save; without it, cache steps are effectively no-ops in local testing.
 - Any test fixture created for local iteration stays untracked/cleaned up before committing —
