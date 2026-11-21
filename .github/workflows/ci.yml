@@ -636,6 +636,99 @@ jobs:
             exit 1
           fi
 
+  # The fixture's packageManager pins 1.4.3, so seeing 1.4.2 proves bun-version wins.
+  test-setup-nextjs-bun-bun-version:
+    name: setup-nextjs-bun self-test (bun-version overrides packageManager)
+    needs: test-setup-nextjs-bun-cold
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./setup-nextjs-bun
+        with:
+          working-directory: .github/test-fixtures/nextjs-app
+          bun-version: "1.4.2"
+      - name: assert the explicit Bun version was installed
+        run: |
+          got=$(bun --version)
+          if [ "$got" != "1.4.2" ]; then
+            echo "::error::expected bun 1.4.2 from bun-version, got '$got'" >&2
+            exit 1
+          fi
+
+  # Shares the 1.63.0 Playwright cache key with setup-bun's playwright-directory pair, so it
+  # runs after that pair and asserts only the resolved pin, never a cold or warm cache.
+  test-setup-nextjs-bun-playwright-directory:
+    name: setup-nextjs-bun self-test (playwright-directory)
+    needs: test-setup-bun-playwright-directory-warm
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./setup-nextjs-bun
+        with:
+          working-directory: .github/test-fixtures/bun-workspace-playwright
+          install-playwright: "true"
+          playwright-directory: .github/test-fixtures/bun-workspace-playwright/apps/web
+          playwright-browsers: chromium
+      - name: assert the pin came from apps/web
+        env:
+          PW_VERSION: ${{ steps.setup.outputs.playwright-version }}
+        run: |
+          if [ "$PW_VERSION" != "1.63.0" ]; then
+            echo "::error::expected playwright-version=1.63.0 from apps/web, got '$PW_VERSION'" >&2
+            exit 1
+          fi
+
+  # The cold job's key never repeats a SHA-keyed entry, so only the fragment-matched restore
+  # prefix can bring the marker back under a different extra-cache-key.
+  test-setup-nextjs-bun-extra-cache-restore-key-fragment-cold:
+    name: setup-nextjs-bun self-test (extra-cache-restore-key-fragment, cold)
+    needs: test-setup-nextjs-bun-extra-cache-warm
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./setup-nextjs-bun
+        with:
+          working-directory: .github/test-fixtures/nextjs-app
+          extra-cache-paths: .turbo-selftest-nextjs-fragment
+          extra-cache-key: ${{ github.sha }}-fragment-cold
+          extra-cache-restore-key-fragment: ${{ github.sha }}-fragment
+      - name: write the marker the warm job has to see
+        run: |
+          mkdir -p .turbo-selftest-nextjs-fragment
+          echo "$GITHUB_SHA" > .turbo-selftest-nextjs-fragment/marker
+
+  test-setup-nextjs-bun-extra-cache-restore-key-fragment-warm:
+    name: setup-nextjs-bun self-test (extra-cache-restore-key-fragment, warm)
+    needs: test-setup-nextjs-bun-extra-cache-restore-key-fragment-cold
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./setup-nextjs-bun
+        with:
+          working-directory: .github/test-fixtures/nextjs-app
+          extra-cache-paths: .turbo-selftest-nextjs-fragment
+          extra-cache-key: ${{ github.sha }}-fragment-warm
+          extra-cache-restore-key-fragment: ${{ github.sha }}-fragment
+      - name: assert the fragment prefix restored the cold job's entry
+        run: |
+          if [ "$(cat .turbo-selftest-nextjs-fragment/marker 2>/dev/null)" != "$GITHUB_SHA" ]; then
+            echo "::error::extra-cache-restore-key-fragment did not restore the cold job's marker" >&2
+            exit 1
+          fi
+
   # Distinct Playwright version (1.65.0) so playwright-${{ runner.os }}-${version} keys do not
   # collide with setup-bun's 1.64.1 fixture: sharing one version would make a parallel
   # cold pair race one cache key.
@@ -1866,6 +1959,10 @@ jobs:
       - test-setup-nextjs-bun-extra-cache-warm
       - test-setup-nextjs-bun-playwright-cold
       - test-setup-nextjs-bun-playwright-warm
+      - test-setup-nextjs-bun-bun-version
+      - test-setup-nextjs-bun-playwright-directory
+      - test-setup-nextjs-bun-extra-cache-restore-key-fragment-cold
+      - test-setup-nextjs-bun-extra-cache-restore-key-fragment-warm
       - test-setup-go-cache
       - test-setup-go-prune-windows
       - test-setup-go-cache-modules-only
@@ -1931,6 +2028,10 @@ jobs:
             || [ "${{ needs.test-setup-nextjs-bun-extra-cache-warm.result }}" != "success" ] \
             || [ "${{ needs.test-setup-nextjs-bun-playwright-cold.result }}" != "success" ] \
             || [ "${{ needs.test-setup-nextjs-bun-playwright-warm.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-bun-version.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-playwright-directory.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-extra-cache-restore-key-fragment-cold.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-nextjs-bun-extra-cache-restore-key-fragment-warm.result }}" != "success" ] \
             || [ "${{ needs.test-setup-go-cache.result }}" != "success" ] \
             || [ "${{ needs.test-setup-go-prune-windows.result }}" != "success" ] \
             || [ "${{ needs.test-setup-go-cache-modules-only.result }}" != "success" ] \
@@ -1969,7 +2070,7 @@ jobs:
             || [ "${{ needs.test-setup-python-audit-fail.result }}" != "success" ] \
             || [ "${{ needs.test-setup-python-skip-install-no-project.result }}" != "success" ] \
             || [ "${{ needs.test-setup-python-skip-install-audit.result }}" != "success" ]; then
-            echo "lint=${{ needs.lint.result }} reset-self-test-caches=${{ needs.reset-self-test-caches.result }} test-setup-bun-cold=${{ needs.test-setup-bun-cold.result }} test-setup-bun-warm=${{ needs.test-setup-bun-warm.result }} test-setup-bun-extra-cache-cold=${{ needs.test-setup-bun-extra-cache-cold.result }} test-setup-bun-extra-cache-warm=${{ needs.test-setup-bun-extra-cache-warm.result }} test-setup-bun-extra-cache-paths-only-fail=${{ needs.test-setup-bun-extra-cache-paths-only-fail.result }} test-setup-bun-skip-install-cache=${{ needs.test-setup-bun-skip-install-cache.result }} test-setup-bun-skip-install-no-lockfile=${{ needs.test-setup-bun-skip-install-no-lockfile.result }} test-setup-bun-audit-pass=${{ needs.test-setup-bun-audit-pass.result }} test-setup-bun-audit-fail=${{ needs.test-setup-bun-audit-fail.result }} test-setup-bun-skip-install-audit=${{ needs.test-setup-bun-skip-install-audit.result }} test-setup-bun-test-pass=${{ needs.test-setup-bun-test-pass.result }} test-setup-bun-test-fail=${{ needs.test-setup-bun-test-fail.result }} test-setup-nextjs-bun-cold=${{ needs.test-setup-nextjs-bun-cold.result }} test-setup-nextjs-bun-warm=${{ needs.test-setup-nextjs-bun-warm.result }} test-setup-nextjs-bun-next-app-dir-cold=${{ needs.test-setup-nextjs-bun-next-app-dir-cold.result }} test-setup-nextjs-bun-next-app-dir-warm=${{ needs.test-setup-nextjs-bun-next-app-dir-warm.result }} test-setup-nextjs-bun-extra-cache-cold=${{ needs.test-setup-nextjs-bun-extra-cache-cold.result }} test-setup-nextjs-bun-extra-cache-warm=${{ needs.test-setup-nextjs-bun-extra-cache-warm.result }} test-setup-nextjs-bun-playwright-cold=${{ needs.test-setup-nextjs-bun-playwright-cold.result }} test-setup-nextjs-bun-playwright-warm=${{ needs.test-setup-nextjs-bun-playwright-warm.result }} test-setup-go-cache=${{ needs.test-setup-go-cache.result }} test-setup-go-prune-windows=${{ needs.test-setup-go-prune-windows.result }} test-setup-go-cache-modules-only=${{ needs.test-setup-go-cache-modules-only.result }} test-setup-go-no-module=${{ needs.test-setup-go-no-module.result }} test-setup-rust-cache=${{ needs.test-setup-rust-cache.result }} test-setup-rust-no-lockfile=${{ needs.test-setup-rust-no-lockfile.result }} test-setup-rust-toolchain-input=${{ needs.test-setup-rust-toolchain-input.result }} test-setup-rust-clippy-pass=${{ needs.test-setup-rust-clippy-pass.result }} test-setup-rust-clippy-catches-real-issue=${{ needs.test-setup-rust-clippy-catches-real-issue.result }} test-setup-rust-fmt-catches-unformatted=${{ needs.test-setup-rust-fmt-catches-unformatted.result }} test-setup-rust-test-catches-failure=${{ needs.test-setup-rust-test-catches-failure.result }} test-setup-rust-audit=${{ needs.test-setup-rust-audit.result }} test-audit-bun=${{ needs.test-audit-bun.result }} test-setup-bun-playwright-cold=${{ needs.test-setup-bun-playwright-cold.result }} test-setup-bun-playwright-warm=${{ needs.test-setup-bun-playwright-warm.result }} test-setup-bun-playwright-directory-cold=${{ needs.test-setup-bun-playwright-directory-cold.result }} test-setup-bun-playwright-directory-warm=${{ needs.test-setup-bun-playwright-directory-warm.result }} test-setup-go-lint-vuln-pass=${{ needs.test-setup-go-lint-vuln-pass.result }} test-setup-go-govulncheck-fail=${{ needs.test-setup-go-govulncheck-fail.result }} test-setup-go-gorelease-fail=${{ needs.test-setup-go-gorelease-fail.result }} test-setup-go-gorelease-declared-pass=${{ needs.test-setup-go-gorelease-declared-pass.result }} test-setup-go-lint-catches-real-issue=${{ needs.test-setup-go-lint-catches-real-issue.result }} test-setup-go-race-catches-real-race=${{ needs.test-setup-go-race-catches-real-race.result }} test-setup-go-test-pass=${{ needs.test-setup-go-test-pass.result }} test-setup-go-test-fail=${{ needs.test-setup-go-test-fail.result }} test-setup-go-fmt-catches-unformatted=${{ needs.test-setup-go-fmt-catches-unformatted.result }} test-setup-go-windows-compile-fail=${{ needs.test-setup-go-windows-compile-fail.result }} test-setup-python-ruff-format-catches-unformatted=${{ needs.test-setup-python-ruff-format-catches-unformatted.result }} test-setup-python-cold=${{ needs.test-setup-python-cold.result }} test-setup-python-warm=${{ needs.test-setup-python-warm.result }} test-setup-python-gates-pass=${{ needs.test-setup-python-gates-pass.result }} test-setup-python-test-pass=${{ needs.test-setup-python-test-pass.result }} test-setup-python-test-fail=${{ needs.test-setup-python-test-fail.result }} test-setup-python-ruff-catches-real-issue=${{ needs.test-setup-python-ruff-catches-real-issue.result }} test-setup-python-audit-fail=${{ needs.test-setup-python-audit-fail.result }} test-setup-python-skip-install-no-project=${{ needs.test-setup-python-skip-install-no-project.result }} test-setup-python-skip-install-audit=${{ needs.test-setup-python-skip-install-audit.result }}"
+            echo "lint=${{ needs.lint.result }} reset-self-test-caches=${{ needs.reset-self-test-caches.result }} test-setup-bun-cold=${{ needs.test-setup-bun-cold.result }} test-setup-bun-warm=${{ needs.test-setup-bun-warm.result }} test-setup-bun-extra-cache-cold=${{ needs.test-setup-bun-extra-cache-cold.result }} test-setup-bun-extra-cache-warm=${{ needs.test-setup-bun-extra-cache-warm.result }} test-setup-bun-extra-cache-paths-only-fail=${{ needs.test-setup-bun-extra-cache-paths-only-fail.result }} test-setup-bun-skip-install-cache=${{ needs.test-setup-bun-skip-install-cache.result }} test-setup-bun-skip-install-no-lockfile=${{ needs.test-setup-bun-skip-install-no-lockfile.result }} test-setup-bun-audit-pass=${{ needs.test-setup-bun-audit-pass.result }} test-setup-bun-audit-fail=${{ needs.test-setup-bun-audit-fail.result }} test-setup-bun-skip-install-audit=${{ needs.test-setup-bun-skip-install-audit.result }} test-setup-bun-test-pass=${{ needs.test-setup-bun-test-pass.result }} test-setup-bun-test-fail=${{ needs.test-setup-bun-test-fail.result }} test-setup-nextjs-bun-cold=${{ needs.test-setup-nextjs-bun-cold.result }} test-setup-nextjs-bun-warm=${{ needs.test-setup-nextjs-bun-warm.result }} test-setup-nextjs-bun-next-app-dir-cold=${{ needs.test-setup-nextjs-bun-next-app-dir-cold.result }} test-setup-nextjs-bun-next-app-dir-warm=${{ needs.test-setup-nextjs-bun-next-app-dir-warm.result }} test-setup-nextjs-bun-extra-cache-cold=${{ needs.test-setup-nextjs-bun-extra-cache-cold.result }} test-setup-nextjs-bun-extra-cache-warm=${{ needs.test-setup-nextjs-bun-extra-cache-warm.result }} test-setup-nextjs-bun-playwright-cold=${{ needs.test-setup-nextjs-bun-playwright-cold.result }} test-setup-nextjs-bun-playwright-warm=${{ needs.test-setup-nextjs-bun-playwright-warm.result }} test-setup-nextjs-bun-bun-version=${{ needs.test-setup-nextjs-bun-bun-version.result }} test-setup-nextjs-bun-playwright-directory=${{ needs.test-setup-nextjs-bun-playwright-directory.result }} test-setup-nextjs-bun-extra-cache-restore-key-fragment-cold=${{ needs.test-setup-nextjs-bun-extra-cache-restore-key-fragment-cold.result }} test-setup-nextjs-bun-extra-cache-restore-key-fragment-warm=${{ needs.test-setup-nextjs-bun-extra-cache-restore-key-fragment-warm.result }} test-setup-go-cache=${{ needs.test-setup-go-cache.result }} test-setup-go-prune-windows=${{ needs.test-setup-go-prune-windows.result }} test-setup-go-cache-modules-only=${{ needs.test-setup-go-cache-modules-only.result }} test-setup-go-no-module=${{ needs.test-setup-go-no-module.result }} test-setup-rust-cache=${{ needs.test-setup-rust-cache.result }} test-setup-rust-no-lockfile=${{ needs.test-setup-rust-no-lockfile.result }} test-setup-rust-toolchain-input=${{ needs.test-setup-rust-toolchain-input.result }} test-setup-rust-clippy-pass=${{ needs.test-setup-rust-clippy-pass.result }} test-setup-rust-clippy-catches-real-issue=${{ needs.test-setup-rust-clippy-catches-real-issue.result }} test-setup-rust-fmt-catches-unformatted=${{ needs.test-setup-rust-fmt-catches-unformatted.result }} test-setup-rust-test-catches-failure=${{ needs.test-setup-rust-test-catches-failure.result }} test-setup-rust-audit=${{ needs.test-setup-rust-audit.result }} test-audit-bun=${{ needs.test-audit-bun.result }} test-setup-bun-playwright-cold=${{ needs.test-setup-bun-playwright-cold.result }} test-setup-bun-playwright-warm=${{ needs.test-setup-bun-playwright-warm.result }} test-setup-bun-playwright-directory-cold=${{ needs.test-setup-bun-playwright-directory-cold.result }} test-setup-bun-playwright-directory-warm=${{ needs.test-setup-bun-playwright-directory-warm.result }} test-setup-go-lint-vuln-pass=${{ needs.test-setup-go-lint-vuln-pass.result }} test-setup-go-govulncheck-fail=${{ needs.test-setup-go-govulncheck-fail.result }} test-setup-go-gorelease-fail=${{ needs.test-setup-go-gorelease-fail.result }} test-setup-go-gorelease-declared-pass=${{ needs.test-setup-go-gorelease-declared-pass.result }} test-setup-go-lint-catches-real-issue=${{ needs.test-setup-go-lint-catches-real-issue.result }} test-setup-go-race-catches-real-race=${{ needs.test-setup-go-race-catches-real-race.result }} test-setup-go-test-pass=${{ needs.test-setup-go-test-pass.result }} test-setup-go-test-fail=${{ needs.test-setup-go-test-fail.result }} test-setup-go-fmt-catches-unformatted=${{ needs.test-setup-go-fmt-catches-unformatted.result }} test-setup-go-windows-compile-fail=${{ needs.test-setup-go-windows-compile-fail.result }} test-setup-python-ruff-format-catches-unformatted=${{ needs.test-setup-python-ruff-format-catches-unformatted.result }} test-setup-python-cold=${{ needs.test-setup-python-cold.result }} test-setup-python-warm=${{ needs.test-setup-python-warm.result }} test-setup-python-gates-pass=${{ needs.test-setup-python-gates-pass.result }} test-setup-python-test-pass=${{ needs.test-setup-python-test-pass.result }} test-setup-python-test-fail=${{ needs.test-setup-python-test-fail.result }} test-setup-python-ruff-catches-real-issue=${{ needs.test-setup-python-ruff-catches-real-issue.result }} test-setup-python-audit-fail=${{ needs.test-setup-python-audit-fail.result }} test-setup-python-skip-install-no-project=${{ needs.test-setup-python-skip-install-no-project.result }} test-setup-python-skip-install-audit=${{ needs.test-setup-python-skip-install-audit.result }}"
             exit 1
           fi
           echo "all checks passed"

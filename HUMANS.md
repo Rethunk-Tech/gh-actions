@@ -21,7 +21,7 @@ Generic Bun toolchain + install + cache. No framework assumptions.
 - uses: Rethunk-Tech/gh-actions/setup-bun@v1.33
   with:
     working-directory: frontend        # default: .
-    # bun-version: "1.4.3"            # default: resolved from package.json's packageManager
+    # bun-version: "1.4.3"            # escape hatch, no fleet caller sets it: pin Bun apart from package.json's packageManager (default)
     # install-args: --no-frozen-lockfile
     # node-version: "22"               # opt-in Node runtime alongside Bun
     # install-playwright: "true"
@@ -129,6 +129,12 @@ because of [actions/runner#2009](https://github.com/actions/runner/issues/2009) 
     # bun-version, node-version, next-app-directory, install-playwright,
     # playwright-browsers, playwright-directory, extra-cache-paths, extra-cache-key,
     # extra-cache-restore-key-fragment
+    #
+    # Escape hatches no fleet caller sets (each self-tested):
+    #   bun-version: pin Bun apart from package.json's packageManager
+    #   playwright-directory: the Playwright app is not the install root (workspace)
+    #   extra-cache-restore-key-fragment: restore an extra cache only from entries whose key
+    #     starts with this fragment, instead of any earlier one for the same paths
 ```
 
 **Bun workspace / monorepo**, where `bun install` must run at the workspace root but the
@@ -231,14 +237,14 @@ a final gate step, so enabling more than one still surfaces every finding even i
   with:
     run-lint: "true"                 # Linux and macOS runners; binary checksum-verified per run
     # run-test-race: "false"         # default; keep this a lint/vuln-only job
-    # lint-version: v2.15.0          # default: built with go1.27, matching the fleet's modules
-    # lint-args: --timeout 5m        # extra flags for `golangci-lint run` only
+    # lint-version: v2.15.0          # escape hatch, no fleet caller sets it: pin another golangci-lint when a module's go directive outruns the default (go1.27 build)
+    # lint-args: --timeout 5m        # escape hatch, no fleet caller sets it: extra flags for `golangci-lint run` only
     run-fmt: "true"                  # separate input: `golangci-lint run` does not run formatters,
                                      # and one input for both would fail every repo that has only
                                      # ever run `golangci-lint run`
     run-govulncheck: "true"
-    # govulncheck-version: v1.9.0    # default
-    # govulncheck-args: -tags=foo
+    # govulncheck-version: v1.9.0    # escape hatch, no fleet caller sets it: pin another govulncheck when the default misses a Go release
+    # govulncheck-args: -tags=foo    # escape hatch, no fleet caller sets it: scan code behind build tags
     # run-gorelease: "true"          # opt-in: fail on an undeclared incompatible exported-API change
                                      # against the latest published version; a `### Removed` heading
                                      # or `Breaking:` line under CHANGELOG.md [Unreleased] declares one

@@ -60,9 +60,9 @@ for.
   (`setup-go`'s opt-in `run-lint`/`run-fmt`/`run-gorelease` and its default-on `run-govulncheck`, `setup-python`'s
   `run-ruff`/`run-ruff-format`/`run-audit`, `setup-rust`'s `run-clippy`/`run-fmt`/`run-audit`, and
   `setup-bun`'s `run-audit`, all off by default except `run-govulncheck`):
-  unlike build/test, every real fleet caller invokes the exact same tools for its language
+  unlike build/test, the fleet's callers invoke the same tools for its language
   (`golangci-lint` and `govulncheck` for Go; `ruff` and `uv audit` for Python;
-  `cargo clippy --locked --all-targets -- -D warnings`, `cargo fmt --all -- --check` and `cargo audit` for Rust;
+  `cargo clippy --locked --all-targets -- -D warnings`, `cargo fmt --all -- --check` and `cargo audit` for Rust, whose `run-*` inputs only the self-tests exercise: heft runs fmt, clippy and test through `gate`;
   `audit-bun/audit.ts` for Bun).
   Go and Python vary only version/args — real passthrough inputs, not a project-defined verb — and Rust's and Bun's commands
   do not vary at all. `setup-bun` calls `audit-bun/audit.ts` rather than keeping a second auditor. Centralizing them converges the fleet onto one reviewed SHA pin instead of
