@@ -160,7 +160,7 @@ outputs as `setup-bun` when `install-playwright` is on.
 
 Go toolchain via `actions/setup-go`, plus a module/build cache keyed per job. Optionally also
 runs `go test ./...`, `go test -race ./...`, golangci-lint, `golangci-lint fmt --diff`, and/or
-govulncheck, gorelease as gates on the same job — opt-in, off by default, except govulncheck, which is on by default (set `run-govulncheck: "false"` to opt out; a job with no `go.mod`/`go.work` skips it with a notice). `go test` and `go test -race`
+govulncheck, gorelease as gates on the same job — opt-in, off by default, except govulncheck, which is on by default (set `run-govulncheck: "false"` to opt out; a job with no `go.mod` at the module root, such as a tools-only or go.work-only one, skips it with a notice). `go test` and `go test -race`
 are separate inputs: `run-test` does not pass `-race`, and `run-test-race` does not run the
 plain suite. Cross-compiles for Windows on the existing runner by default; set
 `run-windows-compile` to `"false"` in a repo that does not support Windows.

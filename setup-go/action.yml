@@ -106,7 +106,7 @@ inputs:
     description: >
       When true, runs govulncheck (via `go run`, no binary left installed) after the toolchain
       is set up. On by default, so every Go module gets scanned; set "false" to opt out. A caller
-      with no go.mod or go.work (a tools-only job) skips the step with a notice.
+      with no go.mod at its module root (a tools-only job or a go.work-only root) skips the step with a notice.
     required: false
     default: "true"
   govulncheck-version:
@@ -155,7 +155,7 @@ outputs:
     description: Outcome of the `golangci-lint fmt --diff` gate (success, failure or skipped when run-fmt is off).
     value: ${{ steps.fmt.outcome }}
   govulncheck-outcome:
-    description: Outcome of the govulncheck gate (success, failure, or skipped when run-govulncheck is off or there is no module).
+    description: Outcome of the govulncheck gate (success, failure, or skipped when run-govulncheck is off or there is no go.mod).
     value: ${{ steps.govulncheck.outcome }}
   gorelease-outcome:
     description: Outcome of the gorelease gate (success, failure or skipped when run-gorelease is off).
@@ -268,6 +268,10 @@ runs:
           # A caller that only installs Go tools has no module to cross-compile.
           if [ -f "$dir/go.mod" ] || [ -f "$dir/go.work" ]; then
             echo "module=true" >> "$GITHUB_OUTPUT"
+          fi
+          # govulncheck refuses a go.work-only root, so it keys on go.mod alone.
+          if [ -f "$dir/go.mod" ]; then
+            echo "gomod=true" >> "$GITHUB_OUTPUT"
           fi
         fi
         {
@@ -469,13 +473,13 @@ runs:
         key: ${{ steps.lint-cache.outputs.cache-primary-key }}
 
     - name: govulncheck skipped (no module)
-      if: inputs.run-govulncheck == 'true' && steps.moddir.outputs.module != 'true'
+      if: inputs.run-govulncheck == 'true' && steps.moddir.outputs.gomod != 'true'
       shell: bash
-      run: echo "::notice::govulncheck skipped, no go.mod or go.work found for this caller"
+      run: echo "::notice::govulncheck skipped, no go.mod at the module root for this caller"
 
     - name: govulncheck
       id: govulncheck
-      if: inputs.run-govulncheck == 'true' && steps.moddir.outputs.module == 'true'
+      if: inputs.run-govulncheck == 'true' && steps.moddir.outputs.gomod == 'true'
       continue-on-error: true
       shell: bash
       working-directory: ${{ steps.moddir.outputs.dir }}
