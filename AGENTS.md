@@ -45,20 +45,6 @@ was built anyway. heft's `Swatinem/rust-cache` and `dtolnay/rust-toolchain` are 
 GitHub-owned, so every heft job depended on third-party actions no org allowlist here vouches
 for.
 
-**Designed, not yet built (`v2`):** `upload-pages`. Deferred, not wrong — a near-pure
-passthrough saving a couple of lines, and it currently has exactly one caller
-(`Rethunk-AI/bakeoff-results`), which otherwise depends on nothing here. Revisit at a second
-caller. Pick it up by giving it its own directory following the conventions below; re-verify
-the design against the fleet's current state before building rather than trusting old design
-notes as binding.
-
-### Recount
-
-Next work is a read-only fleet recount of hand-rolled CI steps. A new composite action is
-built only when a candidate clears the same bar `setup-python` cleared: many sites across
-repos, incompatible variants. That recount happens before any new action, rather than
-trusting the counts already written above.
-
 ## Conventions every action here follows
 
 - **No `actions/checkout`.** The caller does that first, before the `uses:` line — standard
