@@ -25,7 +25,7 @@ class ActCallersSrc(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             bin_dir = Path(tmp) / "bin"
             bin_dir.mkdir()
-            _stub(bin_dir, "act", "exit 0")
+            _stub(bin_dir, "act", "echo Job succeeded")
             _stub(bin_dir, "docker", "exit 0")
             _stub(bin_dir, "bosun", bosun)
             env = {
