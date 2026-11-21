@@ -1,3 +1,3 @@
 module github.com/Rethunk-Tech/go-semverish
 
-go 1.26
+go 1.27.4
