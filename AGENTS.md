@@ -57,7 +57,7 @@ for.
   `setup-rust`'s opt-in `run-test` always runs `cargo test --locked --all-targets`, and
   `setup-bun`'s opt-in `run-test` always runs `bun test`.
   **Lint/security-gate steps are the other deliberate exception**
-  (`setup-go`'s opt-in `run-lint`/`run-fmt`/`run-govulncheck`, `setup-python`'s
+  (`setup-go`'s opt-in `run-lint`/`run-fmt`/`run-govulncheck`/`run-gorelease`, `setup-python`'s
   `run-ruff`/`run-ruff-format`/`run-audit`, `setup-rust`'s `run-clippy`/`run-fmt`/`run-audit`, and
   `setup-bun`'s `run-audit`, all off by default):
   unlike build/test, every real fleet caller invokes the exact same tools for its language
@@ -135,6 +135,8 @@ passes without its gate, so only the gate can catch it:
 | `python-app-failing` | one pytest assertion fails |
 | `python-app-vulnerable` | jinja2 3.1.3, advisories with shipped fixes |
 | `go-app-vulnerable` | golang-jwt/jwt v4.5.0, advisories with shipped fixes |
+| `go-api-break` | `Parse` signature differs from the published go-semverish, undeclared in CHANGELOG |
+| `go-api-break-declared` | the same break, declared under CHANGELOG `[Unreleased]` `### Removed`, so it passes |
 | `bun-app-vulnerable` | lodash 4.17.20, an advisory with a shipped fix, shared with `audit-bun` |
 | `bun-app-failing` | one `bun test` assertion fails | A few things that are easy
 to get wrong when writing that kind of test:

@@ -154,7 +154,7 @@ outputs as `setup-bun` when `install-playwright` is on.
 
 Go toolchain via `actions/setup-go`, plus a module/build cache keyed per job. Optionally also
 runs `go test ./...`, `go test -race ./...`, golangci-lint, `golangci-lint fmt --diff`, and/or
-govulncheck as gates on the same job — opt-in, off by default. `go test` and `go test -race`
+govulncheck, and/or gorelease as gates on the same job — opt-in, off by default. `go test` and `go test -race`
 are separate inputs: `run-test` does not pass `-race`, and `run-test-race` does not run the
 plain suite. Cross-compiles for Windows on the existing runner by default; set
 `run-windows-compile` to `"false"` in a repo that does not support Windows.
@@ -171,7 +171,7 @@ plain suite. Cross-compiles for Windows on the existing runner by default; set
     # run-windows-compile: "false"  # default true; set false if the module does not support Windows
 ```
 
-Outputs: `go-version`, `cache-hit` (an exact key match for this job), `cache-mode` (`build` when the module and build caches are stored, `modules` when `cache-build` is `"false"`, `off` when `cache` is `"false"`), and `test-outcome`, `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome`, `windows-compile-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
+Outputs: `go-version`, `cache-hit` (an exact key match for this job), `cache-mode` (`build` when the module and build caches are stored, `modules` when `cache-build` is `"false"`, `off` when `cache` is `"false"`), and `test-outcome`, `test-race-outcome`, `lint-outcome`, `fmt-outcome`, `govulncheck-outcome`, `gorelease-outcome`, `windows-compile-outcome` — each gate's own result (`success`, `failure`, or `skipped` when its input is off), for a caller that needs to tell which gate failed.
 
 The cache key is Go version + job id + dependency hash, so a job with `run-test-race` enabled and
 a lint-only job each restore the build cache they filled themselves — a lint job's cache is never
@@ -239,6 +239,9 @@ a final gate step, so enabling more than one still surfaces every finding even i
     run-govulncheck: "true"
     # govulncheck-version: v1.9.0    # default
     # govulncheck-args: -tags=foo
+    # run-gorelease: "true"          # opt-in: fail on an undeclared incompatible exported-API change
+                                     # against the latest published version; a `### Removed` heading
+                                     # or `Breaking:` line under CHANGELOG.md [Unreleased] declares one
 ```
 
 Doesn't fit every caller — a custom JSON-output/non-fatal gating script, or a job-level

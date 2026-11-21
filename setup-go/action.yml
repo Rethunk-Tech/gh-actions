@@ -3,7 +3,7 @@ description: >
   Install a Go toolchain via actions/setup-go and cache its module and build caches per job
   (cache-build false stores modules only).
   Optionally also run `go test ./...`, the race-enabled test suite, golangci-lint,
-  golangci-lint fmt, and/or govulncheck as gates on the same job — opt-in, off by default.
+  golangci-lint fmt, govulncheck, and/or gorelease as gates on the same job — opt-in, off by default.
   Cross-compiles for Windows on the existing runner by default (`GOOS=windows go test
   -exec=true ./...`) so `*_windows.go` is type-checked without a Windows runner.
   Writes a pass/fail table to the job's step summary.
@@ -115,6 +115,18 @@ inputs:
     description: Extra args for govulncheck before the scanned path (e.g. -tags=foo).
     required: false
     default: ""
+  run-gorelease:
+    description: >
+      When true, runs gorelease (via `go run`) against the module's latest published version
+      and fails on incompatible exported-API changes unless the module's CHANGELOG.md
+      `[Unreleased]` section declares the break (a `### Removed` heading or a `Breaking:` line).
+      Skipped with a notice when the module has no published version yet. Off by default.
+    required: false
+    default: "false"
+  gorelease-version:
+    description: golang.org/x/exp pseudo-version to run gorelease from.
+    required: false
+    default: v0.0.0-20261121134650-e1094eeca1b5
 
 outputs:
   go-version:
@@ -143,6 +155,9 @@ outputs:
   govulncheck-outcome:
     description: Outcome of the govulncheck gate (success, failure or skipped when run-govulncheck is off).
     value: ${{ steps.govulncheck.outcome }}
+  gorelease-outcome:
+    description: Outcome of the gorelease gate (success, failure or skipped when run-gorelease is off).
+    value: ${{ steps.gorelease.outcome }}
   windows-compile-outcome:
     description: Outcome of the Windows compile gate (success, failure or skipped when run-windows-compile is off).
     value: ${{ steps.windows-compile.outcome }}
@@ -176,7 +191,7 @@ runs:
         CACHE_DEPENDENCY_PATH: ${{ inputs.cache-dependency-path }}
         # hashFiles takes one glob per argument; a newline-joined list is one unmatched pattern.
         HASH_FILES_SINGLE: ${{ hashFiles(inputs.cache-dependency-path) }}
-        NEEDS_DIR: ${{ inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' }}
+        NEEDS_DIR: ${{ inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' || inputs.run-gorelease == 'true' }}
       run: |
         . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
         hash_listed() {
@@ -476,6 +491,40 @@ runs:
           go run "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION" ./...
         fi
 
+    - name: gorelease
+      id: gorelease
+      if: inputs.run-gorelease == 'true'
+      continue-on-error: true
+      shell: bash
+      working-directory: ${{ steps.moddir.outputs.dir }}
+      env:
+        GORELEASE_VERSION: ${{ inputs.gorelease-version }}
+      run: |
+        . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
+        case "$GORELEASE_VERSION" in
+          *[/@[:space:]]*)
+            echo "::error::$(github_encode "gorelease-version must be a single module version without slashes, extra @, or whitespace (got '$GORELEASE_VERSION')")" >&2
+            exit 1
+            ;;
+        esac
+        # gorelease exits 0 on incompatible changes, so the report is read rather than the status.
+        status=0
+        report=$(go run "golang.org/x/exp/cmd/gorelease@$GORELEASE_VERSION" 2>&1) || status=$?
+        printf '%s\n' "$report"
+        if printf '%s\n' "$report" | grep -q '^gorelease: could not find base version'; then
+          echo "::notice::gorelease skipped: the module has no published version to compare against"
+          exit 0
+        fi
+        if printf '%s\n' "$report" | grep -q '^## incompatible changes'; then
+          if [ -f CHANGELOG.md ] && awk '/^## /{on=($0 ~ /^## \[Unreleased\]/);next} on' CHANGELOG.md | grep -qE '^### Removed|Breaking:'; then
+            echo "::notice::incompatible changes are declared in CHANGELOG.md [Unreleased]"
+            exit 0
+          fi
+          echo "::error::gorelease found incompatible exported-API changes that CHANGELOG.md [Unreleased] does not declare (add a '### Removed' heading or a 'Breaking:' line)" >&2
+          exit 1
+        fi
+        exit "$status"
+
     # Writes a plain pass/fail table to the job's step summary (the Actions UI "Summary" tab)
     # — every caller gets at-a-glance visibility without parsing step logs. Deliberately NOT a
     # severity-tiered/JSON-parsed report: that's real per-caller business logic (e.g. citadel's
@@ -483,7 +532,7 @@ runs:
     # business opinionating about. A caller that wants that keeps its own downstream step
     # reading govulncheck's `-json` output directly instead of enabling run-govulncheck here.
     - name: Gate on test/lint/fmt/govulncheck results
-      if: inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' || inputs.run-windows-compile == 'true'
+      if: inputs.run-test == 'true' || inputs.run-test-race == 'true' || inputs.run-lint == 'true' || inputs.run-fmt == 'true' || inputs.run-govulncheck == 'true' || inputs.run-gorelease == 'true' || inputs.run-windows-compile == 'true'
       shell: bash
       env:
         RUN_TEST: ${{ inputs.run-test }}
@@ -491,12 +540,14 @@ runs:
         RUN_LINT: ${{ inputs.run-lint }}
         RUN_FMT: ${{ inputs.run-fmt }}
         RUN_VULN: ${{ inputs.run-govulncheck }}
+        RUN_GORELEASE: ${{ inputs.run-gorelease }}
         RUN_WINDOWS_COMPILE: ${{ inputs.run-windows-compile }}
         TEST_OUTCOME: ${{ steps.test.outcome }}
         TEST_RACE_OUTCOME: ${{ steps.test-race.outcome }}
         LINT_OUTCOME: ${{ steps.lint.outcome }}
         FMT_OUTCOME: ${{ steps.fmt.outcome }}
         VULN_OUTCOME: ${{ steps.govulncheck.outcome }}
+        GORELEASE_OUTCOME: ${{ steps.gorelease.outcome }}
         WINDOWS_COMPILE_OUTCOME: ${{ steps.windows-compile.outcome }}
       run: |
         row() {
@@ -519,6 +570,7 @@ runs:
         row "$RUN_LINT" "$LINT_OUTCOME" "golangci-lint"
         row "$RUN_FMT" "$FMT_OUTCOME" "golangci-lint fmt --diff"
         row "$RUN_VULN" "$VULN_OUTCOME" "govulncheck"
+        row "$RUN_GORELEASE" "$GORELEASE_OUTCOME" "gorelease"
         row "$RUN_WINDOWS_COMPILE" "$WINDOWS_COMPILE_OUTCOME" "Windows compile"
 
         failed=0
@@ -540,6 +592,10 @@ runs:
         fi
         if [ "$VULN_OUTCOME" = "failure" ]; then
           echo "::error::govulncheck found vulnerabilities — see the govulncheck step above" >&2
+          failed=1
+        fi
+        if [ "$GORELEASE_OUTCOME" = "failure" ]; then
+          echo "::error::gorelease failed — see the gorelease step above" >&2
           failed=1
         fi
         if [ "$WINDOWS_COMPILE_OUTCOME" = "failure" ]; then

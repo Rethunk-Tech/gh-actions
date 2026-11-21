@@ -1332,6 +1332,51 @@ jobs:
             exit 1
           fi
 
+  # Proves the gorelease gate fires: the fixture reuses go-semverish's published module path
+  # (gorelease takes its base from the module proxy) with a changed Parse signature and no
+  # CHANGELOG declaration. Other gates stay off so only this one can produce the failure.
+  test-setup-go-gorelease-fail:
+    name: setup-go self-test (gorelease gate fires)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        continue-on-error: true
+        uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-api-break/go.mod
+          run-gorelease: "true"
+      - name: assert the gorelease gate failed and the other gates stayed off
+        env:
+          OUTCOME: ${{ steps.setup.outcome }}
+          GORELEASE: ${{ steps.setup.outputs.gorelease-outcome }}
+          VULN: ${{ steps.setup.outputs.govulncheck-outcome }}
+          TEST: ${{ steps.setup.outputs.test-outcome }}
+        run: |
+          if [ "$OUTCOME" != "failure" ] || [ "$GORELEASE" != "failure" ] || [ "$VULN" != "skipped" ] || [ "$TEST" != "skipped" ]; then
+            echo "::error::expected gorelease to fail on an undeclared break with other gates skipped, got composite '$OUTCOME', gorelease '$GORELEASE', govulncheck '$VULN', test '$TEST'" >&2
+            exit 1
+          fi
+
+  # Same incompatible change as above, declared under CHANGELOG.md [Unreleased] ### Removed.
+  test-setup-go-gorelease-declared-pass:
+    name: setup-go self-test (gorelease passes a declared break)
+    needs: reset-self-test-caches
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./setup-go
+        with:
+          go-version-file: .github/test-fixtures/go-api-break-declared/go.mod
+          run-gorelease: "true"
+
   # Proves two things: the lint gate actually fires rather than silently no-op'ing — a fixture
   # with a real errcheck violation (os.Open's error return discarded), confirmed locally to
   # compile clean but fail `golangci-lint run` before this job existed — and that govulncheck
@@ -1835,6 +1880,8 @@ jobs:
       - test-setup-bun-playwright-directory-warm
       - test-setup-go-lint-vuln-pass
       - test-setup-go-govulncheck-fail
+      - test-setup-go-gorelease-fail
+      - test-setup-go-gorelease-declared-pass
       - test-setup-go-lint-catches-real-issue
       - test-setup-go-race-catches-real-race
       - test-setup-go-test-pass
@@ -1898,6 +1945,8 @@ jobs:
             || [ "${{ needs.test-setup-bun-playwright-directory-warm.result }}" != "success" ] \
             || [ "${{ needs.test-setup-go-lint-vuln-pass.result }}" != "success" ] \
             || [ "${{ needs.test-setup-go-govulncheck-fail.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-gorelease-fail.result }}" != "success" ] \
+            || [ "${{ needs.test-setup-go-gorelease-declared-pass.result }}" != "success" ] \
             || [ "${{ needs.test-setup-go-lint-catches-real-issue.result }}" != "success" ] \
             || [ "${{ needs.test-setup-go-race-catches-real-race.result }}" != "success" ] \
             || [ "${{ needs.test-setup-go-test-pass.result }}" != "success" ] \
@@ -1915,7 +1964,7 @@ jobs:
             || [ "${{ needs.test-setup-python-audit-fail.result }}" != "success" ] \
             || [ "${{ needs.test-setup-python-skip-install-no-project.result }}" != "success" ] \
             || [ "${{ needs.test-setup-python-skip-install-audit.result }}" != "success" ]; then
-            echo "lint=${{ needs.lint.result }} reset-self-test-caches=${{ needs.reset-self-test-caches.result }} test-setup-bun-cold=${{ needs.test-setup-bun-cold.result }} test-setup-bun-warm=${{ needs.test-setup-bun-warm.result }} test-setup-bun-extra-cache-cold=${{ needs.test-setup-bun-extra-cache-cold.result }} test-setup-bun-extra-cache-warm=${{ needs.test-setup-bun-extra-cache-warm.result }} test-setup-bun-extra-cache-paths-only-fail=${{ needs.test-setup-bun-extra-cache-paths-only-fail.result }} test-setup-bun-skip-install-cache=${{ needs.test-setup-bun-skip-install-cache.result }} test-setup-bun-skip-install-no-lockfile=${{ needs.test-setup-bun-skip-install-no-lockfile.result }} test-setup-bun-audit-pass=${{ needs.test-setup-bun-audit-pass.result }} test-setup-bun-audit-fail=${{ needs.test-setup-bun-audit-fail.result }} test-setup-bun-skip-install-audit=${{ needs.test-setup-bun-skip-install-audit.result }} test-setup-bun-test-pass=${{ needs.test-setup-bun-test-pass.result }} test-setup-bun-test-fail=${{ needs.test-setup-bun-test-fail.result }} test-setup-nextjs-bun-cold=${{ needs.test-setup-nextjs-bun-cold.result }} test-setup-nextjs-bun-warm=${{ needs.test-setup-nextjs-bun-warm.result }} test-setup-nextjs-bun-next-app-dir-cold=${{ needs.test-setup-nextjs-bun-next-app-dir-cold.result }} test-setup-nextjs-bun-next-app-dir-warm=${{ needs.test-setup-nextjs-bun-next-app-dir-warm.result }} test-setup-nextjs-bun-extra-cache-cold=${{ needs.test-setup-nextjs-bun-extra-cache-cold.result }} test-setup-nextjs-bun-extra-cache-warm=${{ needs.test-setup-nextjs-bun-extra-cache-warm.result }} test-setup-nextjs-bun-playwright-cold=${{ needs.test-setup-nextjs-bun-playwright-cold.result }} test-setup-nextjs-bun-playwright-warm=${{ needs.test-setup-nextjs-bun-playwright-warm.result }} test-setup-go-cache=${{ needs.test-setup-go-cache.result }} test-setup-go-prune-windows=${{ needs.test-setup-go-prune-windows.result }} test-setup-go-cache-modules-only=${{ needs.test-setup-go-cache-modules-only.result }} test-setup-go-no-module=${{ needs.test-setup-go-no-module.result }} test-setup-rust-cache=${{ needs.test-setup-rust-cache.result }} test-setup-rust-no-lockfile=${{ needs.test-setup-rust-no-lockfile.result }} test-setup-rust-toolchain-input=${{ needs.test-setup-rust-toolchain-input.result }} test-setup-rust-clippy-pass=${{ needs.test-setup-rust-clippy-pass.result }} test-setup-rust-clippy-catches-real-issue=${{ needs.test-setup-rust-clippy-catches-real-issue.result }} test-setup-rust-fmt-catches-unformatted=${{ needs.test-setup-rust-fmt-catches-unformatted.result }} test-setup-rust-test-catches-failure=${{ needs.test-setup-rust-test-catches-failure.result }} test-setup-rust-audit=${{ needs.test-setup-rust-audit.result }} test-audit-bun=${{ needs.test-audit-bun.result }} test-setup-bun-playwright-cold=${{ needs.test-setup-bun-playwright-cold.result }} test-setup-bun-playwright-warm=${{ needs.test-setup-bun-playwright-warm.result }} test-setup-bun-playwright-directory-cold=${{ needs.test-setup-bun-playwright-directory-cold.result }} test-setup-bun-playwright-directory-warm=${{ needs.test-setup-bun-playwright-directory-warm.result }} test-setup-go-lint-vuln-pass=${{ needs.test-setup-go-lint-vuln-pass.result }} test-setup-go-govulncheck-fail=${{ needs.test-setup-go-govulncheck-fail.result }} test-setup-go-lint-catches-real-issue=${{ needs.test-setup-go-lint-catches-real-issue.result }} test-setup-go-race-catches-real-race=${{ needs.test-setup-go-race-catches-real-race.result }} test-setup-go-test-pass=${{ needs.test-setup-go-test-pass.result }} test-setup-go-test-fail=${{ needs.test-setup-go-test-fail.result }} test-setup-go-fmt-catches-unformatted=${{ needs.test-setup-go-fmt-catches-unformatted.result }} test-setup-go-windows-compile-fail=${{ needs.test-setup-go-windows-compile-fail.result }} test-setup-python-ruff-format-catches-unformatted=${{ needs.test-setup-python-ruff-format-catches-unformatted.result }} test-setup-python-cold=${{ needs.test-setup-python-cold.result }} test-setup-python-warm=${{ needs.test-setup-python-warm.result }} test-setup-python-gates-pass=${{ needs.test-setup-python-gates-pass.result }} test-setup-python-test-pass=${{ needs.test-setup-python-test-pass.result }} test-setup-python-test-fail=${{ needs.test-setup-python-test-fail.result }} test-setup-python-ruff-catches-real-issue=${{ needs.test-setup-python-ruff-catches-real-issue.result }} test-setup-python-audit-fail=${{ needs.test-setup-python-audit-fail.result }} test-setup-python-skip-install-no-project=${{ needs.test-setup-python-skip-install-no-project.result }} test-setup-python-skip-install-audit=${{ needs.test-setup-python-skip-install-audit.result }}"
+            echo "lint=${{ needs.lint.result }} reset-self-test-caches=${{ needs.reset-self-test-caches.result }} test-setup-bun-cold=${{ needs.test-setup-bun-cold.result }} test-setup-bun-warm=${{ needs.test-setup-bun-warm.result }} test-setup-bun-extra-cache-cold=${{ needs.test-setup-bun-extra-cache-cold.result }} test-setup-bun-extra-cache-warm=${{ needs.test-setup-bun-extra-cache-warm.result }} test-setup-bun-extra-cache-paths-only-fail=${{ needs.test-setup-bun-extra-cache-paths-only-fail.result }} test-setup-bun-skip-install-cache=${{ needs.test-setup-bun-skip-install-cache.result }} test-setup-bun-skip-install-no-lockfile=${{ needs.test-setup-bun-skip-install-no-lockfile.result }} test-setup-bun-audit-pass=${{ needs.test-setup-bun-audit-pass.result }} test-setup-bun-audit-fail=${{ needs.test-setup-bun-audit-fail.result }} test-setup-bun-skip-install-audit=${{ needs.test-setup-bun-skip-install-audit.result }} test-setup-bun-test-pass=${{ needs.test-setup-bun-test-pass.result }} test-setup-bun-test-fail=${{ needs.test-setup-bun-test-fail.result }} test-setup-nextjs-bun-cold=${{ needs.test-setup-nextjs-bun-cold.result }} test-setup-nextjs-bun-warm=${{ needs.test-setup-nextjs-bun-warm.result }} test-setup-nextjs-bun-next-app-dir-cold=${{ needs.test-setup-nextjs-bun-next-app-dir-cold.result }} test-setup-nextjs-bun-next-app-dir-warm=${{ needs.test-setup-nextjs-bun-next-app-dir-warm.result }} test-setup-nextjs-bun-extra-cache-cold=${{ needs.test-setup-nextjs-bun-extra-cache-cold.result }} test-setup-nextjs-bun-extra-cache-warm=${{ needs.test-setup-nextjs-bun-extra-cache-warm.result }} test-setup-nextjs-bun-playwright-cold=${{ needs.test-setup-nextjs-bun-playwright-cold.result }} test-setup-nextjs-bun-playwright-warm=${{ needs.test-setup-nextjs-bun-playwright-warm.result }} test-setup-go-cache=${{ needs.test-setup-go-cache.result }} test-setup-go-prune-windows=${{ needs.test-setup-go-prune-windows.result }} test-setup-go-cache-modules-only=${{ needs.test-setup-go-cache-modules-only.result }} test-setup-go-no-module=${{ needs.test-setup-go-no-module.result }} test-setup-rust-cache=${{ needs.test-setup-rust-cache.result }} test-setup-rust-no-lockfile=${{ needs.test-setup-rust-no-lockfile.result }} test-setup-rust-toolchain-input=${{ needs.test-setup-rust-toolchain-input.result }} test-setup-rust-clippy-pass=${{ needs.test-setup-rust-clippy-pass.result }} test-setup-rust-clippy-catches-real-issue=${{ needs.test-setup-rust-clippy-catches-real-issue.result }} test-setup-rust-fmt-catches-unformatted=${{ needs.test-setup-rust-fmt-catches-unformatted.result }} test-setup-rust-test-catches-failure=${{ needs.test-setup-rust-test-catches-failure.result }} test-setup-rust-audit=${{ needs.test-setup-rust-audit.result }} test-audit-bun=${{ needs.test-audit-bun.result }} test-setup-bun-playwright-cold=${{ needs.test-setup-bun-playwright-cold.result }} test-setup-bun-playwright-warm=${{ needs.test-setup-bun-playwright-warm.result }} test-setup-bun-playwright-directory-cold=${{ needs.test-setup-bun-playwright-directory-cold.result }} test-setup-bun-playwright-directory-warm=${{ needs.test-setup-bun-playwright-directory-warm.result }} test-setup-go-lint-vuln-pass=${{ needs.test-setup-go-lint-vuln-pass.result }} test-setup-go-govulncheck-fail=${{ needs.test-setup-go-govulncheck-fail.result }} test-setup-go-gorelease-fail=${{ needs.test-setup-go-gorelease-fail.result }} test-setup-go-gorelease-declared-pass=${{ needs.test-setup-go-gorelease-declared-pass.result }} test-setup-go-lint-catches-real-issue=${{ needs.test-setup-go-lint-catches-real-issue.result }} test-setup-go-race-catches-real-race=${{ needs.test-setup-go-race-catches-real-race.result }} test-setup-go-test-pass=${{ needs.test-setup-go-test-pass.result }} test-setup-go-test-fail=${{ needs.test-setup-go-test-fail.result }} test-setup-go-fmt-catches-unformatted=${{ needs.test-setup-go-fmt-catches-unformatted.result }} test-setup-go-windows-compile-fail=${{ needs.test-setup-go-windows-compile-fail.result }} test-setup-python-ruff-format-catches-unformatted=${{ needs.test-setup-python-ruff-format-catches-unformatted.result }} test-setup-python-cold=${{ needs.test-setup-python-cold.result }} test-setup-python-warm=${{ needs.test-setup-python-warm.result }} test-setup-python-gates-pass=${{ needs.test-setup-python-gates-pass.result }} test-setup-python-test-pass=${{ needs.test-setup-python-test-pass.result }} test-setup-python-test-fail=${{ needs.test-setup-python-test-fail.result }} test-setup-python-ruff-catches-real-issue=${{ needs.test-setup-python-ruff-catches-real-issue.result }} test-setup-python-audit-fail=${{ needs.test-setup-python-audit-fail.result }} test-setup-python-skip-install-no-project=${{ needs.test-setup-python-skip-install-no-project.result }} test-setup-python-skip-install-audit=${{ needs.test-setup-python-skip-install-audit.result }}"
             exit 1
           fi
           echo "all checks passed"
