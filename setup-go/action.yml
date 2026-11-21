@@ -604,7 +604,7 @@ runs:
           failed=1
         fi
         if [ "$VULN_OUTCOME" = "failure" ]; then
-          echo "::error::govulncheck found vulnerabilities — see the govulncheck step above" >&2
+          echo "::error::govulncheck failed (exit 3 means vulnerabilities, anything else means the scan could not run); see the govulncheck step above" >&2
           failed=1
         fi
         if [ "$GORELEASE_OUTCOME" = "failure" ]; then
