@@ -259,11 +259,11 @@ runs:
         } >> "$GITHUB_ENV"
 
     # Saved in the post step, after the caller's own build/test commands and any action gates have filled both
-    # caches. The job id sits last in the key so that each job keeps its own build profile
-    # (claude-format-hooks: lint saved first and every later -race test job restored a cache
-    # with no race builds, 34-38s warm). A job's first run, or a dependency change, falls back
-    # to the newest cache of any job for the same Go version, and the prune post step bounds
-    # what that fallback carries forward.
+    # caches. The job id precedes the hash in the key so that each job keeps its own build profile
+    # and restore-keys prefer the same job's newest cache, even across a dependency change
+    # (a release job's cache has no race builds, so a test job restoring it compiled cold).
+    # Only a job's first run falls back to the newest cache of any job for the same Go
+    # version, for its module cache, and the prune post step bounds what that carries forward.
     - name: Cache Go modules and build cache
       id: go-cache
       if: inputs.cache != 'false' && inputs.cache-build != 'false' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
@@ -272,9 +272,10 @@ runs:
         path: |
           ${{ env.SETUP_GO_MOD_CACHE }}
           ${{ env.SETUP_GO_BUILD_CACHE }}
-        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-${{ github.job }}${{ inputs.cache-key-suffix && format('-{0}', inputs.cache-key-suffix) || '' }}
+        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-${{ env.SETUP_GO_DEPS_HASH }}${{ inputs.cache-key-suffix && format('-{0}', inputs.cache-key-suffix) || '' }}
         restore-keys: |
-          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-
+          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-${{ env.SETUP_GO_DEPS_HASH }}
+          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-
           setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
 
     - name: Cache Go modules
@@ -283,9 +284,10 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.SETUP_GO_MOD_CACHE }}
-        key: setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-${{ github.job }}
+        key: setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-${{ env.SETUP_GO_DEPS_HASH }}
         restore-keys: |
-          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ env.SETUP_GO_DEPS_HASH }}-
+          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-${{ env.SETUP_GO_DEPS_HASH }}
+          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-
           setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
 
     # Go's own trim only drops entries unused for five days, so each dependency change stacks
