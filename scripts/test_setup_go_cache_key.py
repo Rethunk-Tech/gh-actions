@@ -109,8 +109,8 @@ class SetupGoBuildCachePrune(unittest.TestCase):
 class SetupGoRestoreKeys(unittest.TestCase):
     def test_restore_keys_prefer_the_same_job_before_any_job(self) -> None:
         lines = [l.strip() for l in ACTION.splitlines()]
-        i = lines.index("key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-${{ env.SETUP_GO_DEPS_HASH }}${{ inputs.cache-key-suffix && format('-{0}', inputs.cache-key-suffix) || '' }}")
+        i = lines.index("key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}.${{ env.SETUP_GO_DEPS_HASH }}${{ inputs.cache-key-suffix && format('-{0}', inputs.cache-key-suffix) || '' }}")
         self.assertEqual(lines[i + 1], "restore-keys: |")
-        self.assertTrue(lines[i + 2].endswith("-${{ github.job }}-${{ env.SETUP_GO_DEPS_HASH }}"))
-        self.assertTrue(lines[i + 3].endswith("-${{ github.job }}-"))
+        self.assertTrue(lines[i + 2].endswith("-${{ github.job }}.${{ env.SETUP_GO_DEPS_HASH }}"))
+        self.assertTrue(lines[i + 3].endswith("-${{ github.job }}."))
         self.assertTrue(lines[i + 4].endswith("-go${{ steps.setup-go.outputs.go-version }}-"))

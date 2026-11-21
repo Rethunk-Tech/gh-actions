@@ -287,10 +287,10 @@ runs:
         path: |
           ${{ env.SETUP_GO_MOD_CACHE }}
           ${{ env.SETUP_GO_BUILD_CACHE }}
-        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-${{ env.SETUP_GO_DEPS_HASH }}${{ inputs.cache-key-suffix && format('-{0}', inputs.cache-key-suffix) || '' }}
+        key: setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}.${{ env.SETUP_GO_DEPS_HASH }}${{ inputs.cache-key-suffix && format('-{0}', inputs.cache-key-suffix) || '' }}
         restore-keys: |
-          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-${{ env.SETUP_GO_DEPS_HASH }}
-          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-
+          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}.${{ env.SETUP_GO_DEPS_HASH }}
+          setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}.
           setup-go-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
 
     - name: Cache Go modules
@@ -299,10 +299,10 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.SETUP_GO_MOD_CACHE }}
-        key: setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-${{ env.SETUP_GO_DEPS_HASH }}
+        key: setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}.${{ env.SETUP_GO_DEPS_HASH }}
         restore-keys: |
-          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-${{ env.SETUP_GO_DEPS_HASH }}
-          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}-
+          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}.${{ env.SETUP_GO_DEPS_HASH }}
+          setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.job }}.
           setup-go-mod-${{ runner.os }}-${{ runner.arch }}-go${{ steps.setup-go.outputs.go-version }}-
 
     # Go's own trim only drops entries unused for five days, so each dependency change stacks
