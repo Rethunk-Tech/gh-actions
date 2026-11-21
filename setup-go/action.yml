@@ -471,7 +471,7 @@ runs:
     - name: govulncheck skipped (no module)
       if: inputs.run-govulncheck == 'true' && steps.moddir.outputs.module != 'true'
       shell: bash
-      run: echo "::notice::govulncheck skipped: no go.mod or go.work found for this caller"
+      run: echo "::notice::govulncheck skipped, no go.mod or go.work found for this caller"
 
     - name: govulncheck
       id: govulncheck
