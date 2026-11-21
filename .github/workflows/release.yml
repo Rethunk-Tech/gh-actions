@@ -52,7 +52,7 @@ jobs:
           # to its commit.
           if [ "$(git cat-file -t "refs/tags/$TAG")" = tag ]; then
             subject=$(git tag -l --format='%(contents:subject)' "$TAG")
-            body=$(git tag -l --format='%(contents:body)' "$TAG")
+            body=$(git tag -l --format='%(contents:body)' "$TAG" | sed '/^-----BEGIN .*SIGNATURE-----$/,$d')
           else
             subject=$(git log -1 --format='%s' "$TAG")
             body=$(git log -1 --format='%b' "$TAG")
