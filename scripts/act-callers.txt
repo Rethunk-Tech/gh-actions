@@ -1,5 +1,5 @@
 # One per caller shape setup-go must keep working for: Org/repo workflow job [act args]
-Rethunk-Tech/dom-input-nav ci.yml gate --env GONOSUMDB=github.com/Rethunk-Tech/rethunk-gate-cli
+Rethunk-Tech/dom-input-nav ci.yml gate
 Rethunk-AI/maitre ci.yml gate
 Rethunk-Tech/claude-format-hooks ci.yml test --matrix os:ubuntu-latest
 Rethunk-Tech/rethunk-git-cli ci.yml lint
