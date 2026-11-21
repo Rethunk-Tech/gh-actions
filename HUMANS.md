@@ -154,7 +154,7 @@ outputs as `setup-bun` when `install-playwright` is on.
 
 Go toolchain via `actions/setup-go`, plus a module/build cache keyed per job. Optionally also
 runs `go test ./...`, `go test -race ./...`, golangci-lint, `golangci-lint fmt --diff`, and/or
-govulncheck, and/or gorelease as gates on the same job — opt-in, off by default. `go test` and `go test -race`
+govulncheck, gorelease as gates on the same job — opt-in, off by default. `go test` and `go test -race`
 are separate inputs: `run-test` does not pass `-race`, and `run-test-race` does not run the
 plain suite. Cross-compiles for Windows on the existing runner by default; set
 `run-windows-compile` to `"false"` in a repo that does not support Windows.
