@@ -57,9 +57,9 @@ for.
   `setup-rust`'s opt-in `run-test` always runs `cargo test --locked --all-targets`, and
   `setup-bun`'s opt-in `run-test` always runs `bun test`.
   **Lint/security-gate steps are the other deliberate exception**
-  (`setup-go`'s opt-in `run-lint`/`run-fmt`/`run-govulncheck`/`run-gorelease`, `setup-python`'s
+  (`setup-go`'s opt-in `run-lint`/`run-fmt`/`run-gorelease` and its default-on `run-govulncheck`, `setup-python`'s
   `run-ruff`/`run-ruff-format`/`run-audit`, `setup-rust`'s `run-clippy`/`run-fmt`/`run-audit`, and
-  `setup-bun`'s `run-audit`, all off by default):
+  `setup-bun`'s `run-audit`, all off by default except `run-govulncheck`):
   unlike build/test, every real fleet caller invokes the exact same tools for its language
   (`golangci-lint` and `govulncheck` for Go; `ruff` and `uv audit` for Python;
   `cargo clippy --locked --all-targets -- -D warnings`, `cargo fmt --all -- --check` and `cargo audit` for Rust;
