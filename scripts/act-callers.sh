@@ -4,7 +4,7 @@
 # Usage: scripts/act-callers.sh [REF]   (default: the working tree's HEAD)
 # ACT_CALLERS_ONLY=substr limits the run to matching callers; logs stay in ~/.cache/act-callers.
 # Callers: scripts/act-callers.txt, one "Org/repo workflow job [act args...]" per line.
-# A full pass (every caller ran and passed, no ACT_CALLERS_ONLY) stamps REF's sha into
+# A full pass (every caller ran and passed, none skipped, no ACT_CALLERS_ONLY) stamps REF's sha into
 # ~/.cache/nomad-hud/act-stamp, which nomad-hud's guard requires before a push, tag or pin bump.
 set -euo pipefail
 
@@ -40,13 +40,14 @@ RUN command -v google-chrome >/dev/null || { \
       rm -rf /tmp/chrome.deb /var/lib/apt/lists/*; }
 DOCKERFILE
 
-fail=0 ran=0
+fail=0 ran=0 skipped=0
 while read -r repo wf job extra; do
   case "$repo" in '' | '#'*) continue ;; esac
   [ -z "$only" ] || [[ $repo == *"$only"* ]] || continue
   dir="$src/$repo"
   if [ ! -d "$dir/.git" ]; then
     echo "act-callers: skip $repo (no clone at $dir)"
+    skipped=$((skipped + 1))
     continue
   fi
   # Every gh-actions pin the caller uses maps to this tree. act cannot parse `uses: $/...`
@@ -54,6 +55,7 @@ while read -r repo wf job extra; do
   mapfile -t pins < <(grep -ho 'Rethunk-Tech/gh-actions/[^@]*@[0-9a-f]\{40\}' "$dir/.github/workflows/$wf" | sed 's/.*@//' | sort -u)
   [ ${#pins[@]} -gt 0 ] || {
     echo "act-callers: skip $repo (no gh-actions pin in $wf)"
+    skipped=$((skipped + 1))
     continue
   }
   args=()
@@ -79,8 +81,8 @@ while read -r repo wf job extra; do
   fi
 done <"$here/scripts/act-callers.txt"
 
-echo "act-callers: $ran caller job(s) run, ref $ref"
-if [ "$fail" -eq 0 ] && [ "$ran" -gt 0 ] && [ -z "$only" ]; then
+echo "act-callers: $ran caller job(s) run, $skipped skipped, ref $ref"
+if [ "$fail" -eq 0 ] && [ "$ran" -gt 0 ] && [ "$skipped" -eq 0 ] && [ -z "$only" ]; then
   stamp_dir=$HOME/.cache/nomad-hud
   mkdir -p "$stamp_dir"
   git -C "$here" rev-parse "$ref" >"$stamp_dir/act-stamp.tmp"
