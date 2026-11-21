@@ -38,18 +38,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+ ]]; then
+            echo "$TAG is not a vN.M release; the floating major gets no Release."
+            exit 0
+          fi
           # Re-running a tag push (or a manual backfill that already happened) must not fail
           # the job — the Release existing is the desired end state either way.
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG already exists; nothing to do."
             exit 0
           fi
-          subject=$(git tag -l --format='%(contents:subject)' "$TAG")
-          body=$(git tag -l --format='%(contents:body)' "$TAG")
-          # A lightweight tag has no annotation, so these fall back to the commit's own
-          # subject/body rather than publishing an empty Release.
-          [ -n "$subject" ] || subject=$(git log -1 --format='%s' "$TAG")
-          [ -n "$body" ] || body=$(git log -1 --format='%b' "$TAG")
+          # An annotated tag's message is the release notes; only a lightweight tag falls back
+          # to its commit.
+          if [ "$(git cat-file -t "refs/tags/$TAG")" = tag ]; then
+            subject=$(git tag -l --format='%(contents:subject)' "$TAG")
+            body=$(git tag -l --format='%(contents:body)' "$TAG")
+          else
+            subject=$(git log -1 --format='%s' "$TAG")
+            body=$(git log -1 --format='%b' "$TAG")
+          fi
           gh release create "$TAG" \
             --title "$TAG — $subject" \
             --notes "${body:-$subject}" \
