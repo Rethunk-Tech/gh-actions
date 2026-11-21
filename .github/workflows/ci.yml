@@ -1448,6 +1448,7 @@ jobs:
         with:
           go-version-file: .github/test-fixtures/go-api-break/go.mod
           run-gorelease: "true"
+          run-govulncheck: "false"
       - name: assert the gorelease gate failed and the other gates stayed off
         env:
           OUTCOME: ${{ steps.setup.outcome }}
@@ -1474,6 +1475,7 @@ jobs:
         with:
           go-version-file: .github/test-fixtures/go-api-break-declared/go.mod
           run-gorelease: "true"
+          run-govulncheck: "false"
 
   # Proves two things: the lint gate actually fires rather than silently no-op'ing — a fixture
   # with a real errcheck violation (os.Open's error return discarded), confirmed locally to
