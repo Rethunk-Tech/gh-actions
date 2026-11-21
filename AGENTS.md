@@ -78,9 +78,9 @@ for.
   composite against each consuming org's allowlist, and Rethunk-AI allows only GitHub-owned,
   verified-Marketplace, and `Rethunk-Tech/gh-actions/*` actions. Nested
   `golangci/golangci-lint-action` is not on that allowlist, so `setup-go` downloads golangci-lint itself.
-- **Every wrapped action is SHA-pinned** with a `# vX.Y.Z` comment. The repo-ops
-  actions-refresh-sha sweep keeps these current within a major; a wrapped action's major bump
-  is a manual, reviewed change here.
+- **Every wrapped action is SHA-pinned** with a `# vX.Y.Z` comment. This
+  repository is excluded from the repo-ops dependency sweep, so a wrapped action's bump, major
+  or not, is a manual, reviewed change here.
 - **No inline `${{ inputs.* }}` interpolation inside a `run:` body.** Script-injection
   surface — GitHub's own hardening guidance warns against it. Every value goes in via `env:`
   and is referenced as a shell variable. `actions/upload-pages-artifact` (a first-party
