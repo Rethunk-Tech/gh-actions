@@ -9,5 +9,5 @@ pre-push:
       run: gate
     # Real downstream callers under act: the only check that runs an action the way the fleet does.
     - name: act-callers
-      glob: "{*/action.yml,scripts/*.sh}"
+      glob: "{*/**,scripts/*}"
       run: scripts/act-callers.sh
