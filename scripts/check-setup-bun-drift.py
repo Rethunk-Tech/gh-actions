@@ -25,10 +25,13 @@ WATCHED = (
     "Install Playwright",
     "Install Playwright system deps",
 )
+CACHE_ON = "(inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release'))"
 NO_UNTRUSTED_CACHE = (
-    "github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'"
+    f"{CACHE_ON} && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'"
 )
-LOCKFILE_IF = f"steps.lockfile.outputs.present == 'true' && {NO_UNTRUSTED_CACHE}"
+LOCKFILE_IF = NO_UNTRUSTED_CACHE.replace(
+    f"{CACHE_ON} && ", f"{CACHE_ON} && steps.lockfile.outputs.present == 'true' && ", 1
+)
 PACKAGE_JSON_GUARD = (
     "if [ -f package.json ]; then",
     "else",
