@@ -7,6 +7,13 @@ description: >
   multi-app repo, call this once per app (each with its own next-app-directory).
 
 inputs:
+  cache:
+    description: >
+      Whether to restore and save caches. Empty (the default) means on, except on a tag push or
+      a release event, where it is off so a poisoned cache entry cannot reach a published
+      artifact. "true" or "false" overrides that either way.
+    required: false
+    default: ""
   bun-version:
     description: >
       Bun version to install. Leave empty to resolve from working-directory/package.json's
@@ -156,7 +163,7 @@ runs:
     # No restore-keys: see the same step in setup-bun for the measured store growth.
     - name: Cache Bun install store
       id: bun-cache
-      if: github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
+      if: (inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.bun/install/cache
@@ -173,7 +180,7 @@ runs:
       run: echo "NEXT_SRC_HASH=$NEXT_SRC_HASH" >> "$GITHUB_ENV"
 
     - name: Cache Next.js build cache
-      if: github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
+      if: (inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.NEXT_CACHE_DIR }}
@@ -199,7 +206,7 @@ runs:
       run: echo "hash=$(printf '%s' "$EXTRA_CACHE_PATHS" | git hash-object --stdin)" >> "$GITHUB_OUTPUT"
 
     - name: Cache extra paths
-      if: inputs.extra-cache-paths != '' && inputs.extra-cache-key != '' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
+      if: (inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && inputs.extra-cache-paths != '' && inputs.extra-cache-key != '' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ inputs.extra-cache-paths }}
@@ -265,7 +272,7 @@ runs:
 
     - name: Cache Playwright browsers
       id: playwright-cache
-      if: inputs.install-playwright == 'true' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
+      if: (inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && inputs.install-playwright == 'true' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright

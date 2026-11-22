@@ -5,6 +5,13 @@ description: >
   gates on the same job — opt-in, off by default. Writes a pass/fail table to the job's step summary.
 
 inputs:
+  cache:
+    description: >
+      Whether to restore and save caches. Empty (the default) means on, except on a tag push or
+      a release event, where it is off so a poisoned cache entry cannot reach a published
+      artifact. "true" or "false" overrides that either way.
+    required: false
+    default: ""
   python-version:
     description: >
       Python version to select (e.g. "3.14"), passed to setup-uv, which exports it as
@@ -114,7 +121,7 @@ runs:
         # true, including on release workflows, so that intent is the default here. The two
         # events that run with a fork's code and the base repo's cache stay off: a poisoned
         # cache saved there would be restored by every trusted run.
-        enable-cache: ${{ github.event_name != 'pull_request_target' && github.event_name != 'workflow_run' }}
+        enable-cache: ${{ (inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run' }}
         # The skip-install/PATH-tool caller has no uv.lock or pyproject to hash. Without this,
         # the post-step save fails the job over a cache that was never going to be useful.
         ignore-nothing-to-cache: true

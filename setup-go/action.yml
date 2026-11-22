@@ -33,10 +33,11 @@ inputs:
     default: ""
   cache:
     description: >
-      When false, restore and save no Go cache at all. Release workflows set this false so a
-      poisoned cache entry can't reach a published artifact; everything else keeps the default.
+      Whether to restore and save the Go caches. Empty (the default) means on, except on a tag push or
+      a release event, where it is off so a poisoned cache entry cannot reach a published
+      artifact. "true" or "false" overrides that either way.
     required: false
-    default: "true"
+    default: ""
   cache-build:
     description: >
       When false, cache the module download cache only and skip the build-cache prune. A job
@@ -141,7 +142,7 @@ outputs:
     description: >
       `build` when the module and build caches are stored (the default), `modules` when
       cache-build is false and only the module cache is stored, or `off` when cache is false.
-    value: ${{ inputs.cache == 'false' && 'off' || (inputs.cache-build == 'false' && 'modules' || 'build') }}
+    value: ${{ !(inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && 'off' || (inputs.cache-build == 'false' && 'modules' || 'build') }}
   test-race-outcome:
     description: Outcome of the `go test -race` gate (success, failure or skipped when run-test-race is off).
     value: ${{ steps.test-race.outcome }}
@@ -287,7 +288,7 @@ runs:
     # version, for its module cache, and the prune post step bounds what that carries forward.
     - name: Cache Go modules and build cache
       id: go-cache
-      if: inputs.cache != 'false' && inputs.cache-build != 'false' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
+      if: (inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && inputs.cache-build != 'false' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
@@ -301,7 +302,7 @@ runs:
 
     - name: Cache Go modules
       id: go-mod-cache
-      if: inputs.cache != 'false' && inputs.cache-build == 'false' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
+      if: (inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && inputs.cache-build == 'false' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ env.SETUP_GO_MOD_CACHE }}
@@ -321,7 +322,7 @@ runs:
     # so the old generation stays "recent" and is saved back. Listed after actions/cache so
     # post order is prune then save. $/ is this repo at the running commit (not the caller).
     - name: Prune build cache to the saving job's working set
-      if: inputs.cache != 'false' && inputs.cache-build != 'false'
+      if: (inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && inputs.cache-build != 'false'
       uses: $/setup-go/prune-post
       env:
         SETUP_GO_BUILD_CACHE: ${{ env.SETUP_GO_BUILD_CACHE }}
@@ -332,7 +333,7 @@ runs:
     # inside this action, so restore and save are split and an exact hit skips the save.
     - name: Restore golangci-lint cache
       id: lint-cache
-      if: inputs.cache != 'false' && (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
+      if: (inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/setup-go-golangci-lint
@@ -414,6 +415,8 @@ runs:
       continue-on-error: true
       shell: bash
       working-directory: ${{ steps.moddir.outputs.dir }}
+      env:
+        GORACE: atexit_sleep_ms=0
       run: go test -race ./...
 
     # Linux jobs never type-check *_windows.go / //go:build windows; -exec=true links each
@@ -477,7 +480,7 @@ runs:
         "$GOLANGCI_LINT" fmt --diff
 
     - name: Save golangci-lint cache
-      if: inputs.cache != 'false' && (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && steps.lint-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
+      if: (inputs.cache == 'true' || (inputs.cache == '' && github.ref_type != 'tag' && github.event_name != 'release')) && (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && steps.lint-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/setup-go-golangci-lint

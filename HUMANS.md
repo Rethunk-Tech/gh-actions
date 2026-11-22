@@ -12,6 +12,8 @@ No install step, no setup on the consuming repo beyond a normal `actions/checkou
 
 ## Available actions
 
+`setup-bun`, `setup-nextjs-bun`, `setup-go`, `setup-python` and `setup-rust` share a `cache` input. Left empty it is on, except on a tag push (`github.ref_type == 'tag'`) or a `release` event, where it is off so a poisoned cache entry cannot reach a published artifact. `cache: "true"` or `cache: "false"` overrides that either way.
+
 ### `setup-bun`
 
 Generic Bun toolchain + install + cache. No framework assumptions.
@@ -184,7 +186,7 @@ a lint-only job each restore the build cache they filled themselves — a lint j
 the race-test cache, even after a dependency bump (the same job's newest cache is restored).
 Only a job's first run falls back to the newest cache any job saved for the same Go version. Matrix legs share one job id and therefore one cache entry.
 
-`cache-build` defaults to true. Set it to `"false"` to store the module cache only (no build cache, no prune). Set `cache: "false"` in a release workflow to restore and save no cache at all, so a poisoned cache entry can't reach a published artifact.
+`cache-build` defaults to true. Set it to `"false"` to store the module cache only (no build cache, no prune). `cache` is off by default on tag and release events (see the note under Available actions); `cache: "false"` turns it off everywhere.
 
 `cache-key-suffix` (default empty) is appended to the build cache's primary key only; restore still falls back to the suffix-free prefix. A repo with a stable `go.mod` always hits the primary key, and a hit never saves, so its build cache freezes at the first save; a suffix that changes daily (`echo "date=$(date -u +%F)" >> "$GITHUB_OUTPUT"` in an earlier step) saves a fresh one each day.
 
