@@ -75,6 +75,10 @@ class ReleaseMajorTagRace(unittest.TestCase):
 
         self.assertEqual(floating.get("v1"), "v1.11")
 
+    def test_release_is_gated_on_main_ancestry(self) -> None:
+        text = WORKFLOW.read_text()
+        self.assertLess(text.index("merge-base --is-ancestor"), text.index("gh release create"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -48,6 +48,12 @@ jobs:
             echo "Release $TAG already exists; nothing to do."
             exit 0
           fi
+          # Callers pin @vN, so a release (like the floating major) may only come from a commit
+          # on main; a vN.M tag pushed from a branch or fork-sourced commit gets no Release.
+          if ! git merge-base --is-ancestor "$TAG^{commit}" origin/main; then
+            echo "::error::$TAG is not reachable from origin/main; refusing to release it" >&2
+            exit 1
+          fi
           # An annotated tag's message is the release notes; only a lightweight tag falls back
           # to its commit.
           if [ "$(git cat-file -t "refs/tags/$TAG")" = tag ]; then
