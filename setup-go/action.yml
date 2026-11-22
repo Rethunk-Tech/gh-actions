@@ -332,7 +332,7 @@ runs:
     # inside this action, so restore and save are split and an exact hit skips the save.
     - name: Restore golangci-lint cache
       id: lint-cache
-      if: (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
+      if: inputs.cache != 'false' && (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/setup-go-golangci-lint
@@ -350,6 +350,7 @@ runs:
         LINT_VERSION: ${{ inputs.lint-version }}
         OS_NAME: ${{ runner.os }}
         ARCH_NAME: ${{ runner.arch }}
+        GH_TOKEN: ${{ github.token }}
       run: |
         set -u
         . "${GITHUB_ACTION_PATH}/../scripts/github-workflow-io.sh"
@@ -382,6 +383,16 @@ runs:
           exit 1
         }
         github_sha256 -c expected.txt
+        # The checksums file comes from the same release as the archive, so it proves integrity
+        # only; the attestation ties the archive to golangci-lint's own build workflow.
+        if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+          gh attestation verify "$base.tar.gz" --repo golangci/golangci-lint >/dev/null || {
+            echo "::error::$(github_encode "attestation verification failed for $base.tar.gz")" >&2
+            exit 1
+          }
+        else
+          echo "::notice::gh is unauthenticated or missing; golangci-lint verified by checksum only, not attestation"
+        fi
         tar -xzf "$base.tar.gz"
         echo "bin=$dir/$base/golangci-lint" >> "$GITHUB_OUTPUT"
 
@@ -466,7 +477,7 @@ runs:
         "$GOLANGCI_LINT" fmt --diff
 
     - name: Save golangci-lint cache
-      if: (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && steps.lint-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
+      if: inputs.cache != 'false' && (inputs.run-lint == 'true' || inputs.run-fmt == 'true') && steps.lint-cache.outputs.cache-hit != 'true' && github.event_name != 'pull_request_target' && github.event_name != 'workflow_run'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/setup-go-golangci-lint
