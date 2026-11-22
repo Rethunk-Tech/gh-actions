@@ -3,7 +3,7 @@ Rethunk-Tech/dom-input-nav ci.yml gate
 Rethunk-AI/maitre ci.yml gate
 Rethunk-Tech/claude-format-hooks ci.yml test --matrix os:ubuntu-latest
 Rethunk-Tech/rethunk-git-cli ci.yml lint
-Rethunk-Tech/go-semverish ci.yml test
+Rethunk-Tech/go-semverish ci.yml gate
 Rethunk-Tech/claude-format-hooks ci.yml lint
 Rethunk-AI/bakeoff ci.yml go-migrate
 Rethunk-Tech/heft ci.yml check
