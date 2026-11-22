@@ -6,6 +6,7 @@
 # in ~/.cache/act-callers. ACT_CALLERS_SELFTEST=only runs just the self-tests, =0 skips them.
 # Callers: scripts/act-callers.txt, one "Org/repo workflow job [act args...]" per line. A caller
 # pinning a tag instead of a 40-hex sha is skipped, which blocks the stamp.
+# A ref whose sha is already stamped exits at once (the pre-push hook reruns this after the full pass).
 # Self-tests: ci.yml's Linux jobs, run on a rewritten committed copy of REF with a fresh cache dir.
 # A full pass (self-tests and every caller ran and passed, none skipped, no ACT_CALLERS_ONLY) stamps REF's sha into
 # ~/.cache/nomad-hud/act-stamp, which nomad-hud's guard requires before a push, tag or pin bump.
@@ -25,6 +26,13 @@ for t in act docker; do
     exit 1
   }
 done
+
+# The pre-push hook reruns this after a stamped full pass; a push that waits that long outlives its ssh session.
+stamp=$HOME/.cache/nomad-hud/act-stamp
+if [ -z "$only" ] && [ -z "$selftest" ] && [ "$(cat "$stamp" 2>/dev/null)" = "$(git -C "$here" rev-parse "$ref")" ]; then
+  echo "act-callers: $ref already passed in full, stamp is current"
+  exit 0
+fi
 
 tmp=$(mktemp -d "${TMPDIR:-/var/tmp}/act-callers.XXXXXX")
 trap 'rm -rf --one-file-system -- "$tmp"' EXIT
@@ -120,9 +128,8 @@ done < <([ "$selftest" = only ] || cat "$here/scripts/act-callers.txt")
 
 echo "act-callers: $ran caller job(s) run, $skipped skipped, ref $ref"
 if [ "$fail" -eq 0 ] && [ "$selftested" -eq 1 ] && [ "$ran" -gt 0 ] && [ "$skipped" -eq 0 ] && [ -z "$only" ]; then
-  stamp_dir=$HOME/.cache/nomad-hud
-  mkdir -p "$stamp_dir"
-  git -C "$here" rev-parse "$ref" >"$stamp_dir/act-stamp.tmp"
-  mv "$stamp_dir/act-stamp.tmp" "$stamp_dir/act-stamp"
+  mkdir -p "$(dirname "$stamp")"
+  git -C "$here" rev-parse "$ref" >"$stamp.tmp"
+  mv "$stamp.tmp" "$stamp"
 fi
 exit "$fail"
