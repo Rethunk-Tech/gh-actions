@@ -77,7 +77,13 @@ class ReleaseMajorTagRace(unittest.TestCase):
 
     def test_release_is_gated_on_main_ancestry(self) -> None:
         text = WORKFLOW.read_text()
-        self.assertLess(text.index("merge-base --is-ancestor"), text.index("gh release create"))
+        gate = re.compile(
+            r'if ! git merge-base --is-ancestor "\$TAG\^\{commit\}" origin/main; then\n(?:.*\n)*?\s+exit 1\n\s+fi'
+        )
+        gates = [m.start() for m in gate.finditer(text)]
+        self.assertEqual(len(gates), 2, "release and move-major each need a negated ancestry gate that exits 1")
+        self.assertLess(gates[0], text.index("gh release create"))
+        self.assertLess(gates[1], text.index("push --force"))
 
 
 if __name__ == "__main__":
