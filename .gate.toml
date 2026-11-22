@@ -114,6 +114,16 @@ if cargo test --locked --all-targets; then
 fi
 '''
 
+# Same expected-failure as test-setup-rust-fmt-catches-unformatted: cargo fmt --check must fail.
+[gates.rust-app-unformatted]
+run = '''
+cd .github/test-fixtures/rust-app-unformatted
+if cargo fmt --check; then
+  echo "::error::expected cargo fmt --check to fail on rust-app-unformatted" >&2
+  exit 1
+fi
+'''
+
 # python-app-broken / python-app-unformatted stay CI-only: those jobs assert composite
 # ruff/format outcomes on a GitHub runner, not a command gate can invert locally.
 # rust-app-vulnerable stays CI-only: cargo audit is not in the local rust detect
@@ -130,6 +140,7 @@ exclude = [
   "python-app-unformatted",
   "python-app-vulnerable",
   "rust-app-failing",
+  "rust-app-unformatted",
   "rust-app-vulnerable",
   "bun-app-failing",
 ]
